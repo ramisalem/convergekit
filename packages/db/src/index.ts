@@ -1,0 +1,7 @@
+export { closeDbConnection, db } from './client.js'
+export type { Database } from './client.js'
+export * from './evidence-alignment.js'
+export * from './evidence.js'
+export * from './schema.js'
+export * from './queries/index.js'
+export * from './search.js'

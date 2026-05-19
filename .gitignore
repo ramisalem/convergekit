@@ -1,0 +1,33 @@
+# dependencies
+node_modules
+.pnpm-store
+
+# build outputs
+dist
+.next
+.turbo
+*.tsbuildinfo
+
+# env
+.env
+.env.local
+.env.production
+
+# misc
+*.log
+.DS_Store
+package-lock.json
+.local-db-backups/
+.local/
+
+# claude
+.claude/settings.local.json
+.claude/worktrees/
+
+# next.js
+next-env.d.ts
+
+# workspace clones
+workspace/
+.pids/
+.superpowers/

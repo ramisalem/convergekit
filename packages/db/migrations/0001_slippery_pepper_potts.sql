@@ -1,0 +1,2 @@
+ALTER TABLE "chunks" ADD CONSTRAINT "chunks_document_startline_unique" UNIQUE("document_id","start_line");--> statement-breakpoint
+ALTER TABLE "documents" ADD CONSTRAINT "documents_branch_path_unique" UNIQUE("branch_id","path");

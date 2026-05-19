@@ -1,0 +1,11 @@
+-- Add per-user model overrides and endpoint columns to user_ai_settings
+ALTER TABLE user_ai_settings ADD COLUMN IF NOT EXISTS lm_studio_embedding_model text;
+ALTER TABLE user_ai_settings ADD COLUMN IF NOT EXISTS openrouter_embedding_model text;
+ALTER TABLE user_ai_settings ADD COLUMN IF NOT EXISTS openrouter_endpoint text;
+ALTER TABLE user_ai_settings ADD COLUMN IF NOT EXISTS anthropic_chat_model text;
+ALTER TABLE user_ai_settings ADD COLUMN IF NOT EXISTS anthropic_mindmap_model text;
+ALTER TABLE user_ai_settings ADD COLUMN IF NOT EXISTS anthropic_embedding_model text;
+ALTER TABLE user_ai_settings ADD COLUMN IF NOT EXISTS openai_chat_model text;
+ALTER TABLE user_ai_settings ADD COLUMN IF NOT EXISTS openai_mindmap_model text;
+ALTER TABLE user_ai_settings ADD COLUMN IF NOT EXISTS openai_embedding_model text;
+ALTER TABLE user_ai_settings ADD COLUMN IF NOT EXISTS openai_endpoint text;
