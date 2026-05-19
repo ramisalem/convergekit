@@ -1,0 +1,55 @@
+services:
+  reverse-proxy:
+    environment:
+      CONVERGEKIT_API_UPSTREAM: api:4001
+      CONVERGEKIT_WEB_UPSTREAM: web:4000
+
+  api:
+    environment:
+      NODE_ENV: development
+      PORT: 4001
+    command: ["pnpm", "--filter", "@convergekit/api", "exec", "tsx", "watch", "src/index.ts"]
+    volumes:
+      - ./apps/api/src:/app/apps/api/src
+      - ./packages/ai/src:/app/packages/ai/src
+      - ./packages/auth/src:/app/packages/auth/src
+      - ./packages/config/src:/app/packages/config/src
+      - ./packages/db/src:/app/packages/db/src
+      - ./packages/mcp/src:/app/packages/mcp/src
+      - ./packages/queues/src:/app/packages/queues/src
+      - ./packages/types/src:/app/packages/types/src
+
+  web:
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      HOSTNAME: 0.0.0.0
+      SERVER_API_URL: http://api:4001
+      NEXT_PUBLIC_API_URL: https://convergekit-dev.local
+      NEXT_PUBLIC_WEB_URL: https://convergekit-dev.local
+      DISABLE_LOCAL_API_PROXY: "true"
+    command: ["pnpm", "--filter", "@convergekit/web", "exec", "next", "dev", "--hostname", "0.0.0.0", "--port", "4000"]
+    volumes:
+      - ./tsconfig.base.json:/app/tsconfig.base.json:ro
+      - ./apps/web/src:/app/apps/web/src
+      - ./apps/web/messages:/app/apps/web/messages
+      - ./apps/web/components.json:/app/apps/web/components.json
+      - ./apps/web/next.config.ts:/app/apps/web/next.config.ts
+      - ./apps/web/postcss.config.mjs:/app/apps/web/postcss.config.mjs
+      - ./packages/types/src:/app/packages/types/src
+      - web_next_cache:/app/apps/web/.next
+
+  worker:
+    environment:
+      NODE_ENV: development
+    command: ["pnpm", "--filter", "@convergekit/worker", "exec", "tsx", "watch", "src/index.ts"]
+    volumes:
+      - ./apps/worker/src:/app/apps/worker/src
+      - ./packages/ai/src:/app/packages/ai/src
+      - ./packages/config/src:/app/packages/config/src
+      - ./packages/db/src:/app/packages/db/src
+      - ./packages/queues/src:/app/packages/queues/src
+      - ./packages/types/src:/app/packages/types/src
+
+volumes:
+  web_next_cache:

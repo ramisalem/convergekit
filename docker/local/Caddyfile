@@ -1,0 +1,32 @@
+{
+	auto_https off
+}
+
+http://convergekit-dev.local {
+	redir https://convergekit-dev.local{uri} permanent
+}
+
+https://convergekit-dev.local {
+	tls /certs/convergekit-dev.local.pem /certs/convergekit-dev.local-key.pem
+	encode zstd gzip
+
+	handle /api/chat {
+		reverse_proxy {$CONVERGEKIT_WEB_UPSTREAM:web:3000}
+	}
+
+	handle /api/sign-out {
+		reverse_proxy {$CONVERGEKIT_WEB_UPSTREAM:web:3000}
+	}
+
+	handle /api/notifications {
+		reverse_proxy {$CONVERGEKIT_WEB_UPSTREAM:web:3000}
+	}
+
+	handle /api/* {
+		reverse_proxy {$CONVERGEKIT_API_UPSTREAM:api:3001}
+	}
+
+	handle {
+		reverse_proxy {$CONVERGEKIT_WEB_UPSTREAM:web:3000}
+	}
+}

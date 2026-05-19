@@ -1,0 +1,116 @@
+services:
+  reverse-proxy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+      web:
+        condition: service_started
+    environment:
+      CONVERGEKIT_API_UPSTREAM: api:3001
+      CONVERGEKIT_WEB_UPSTREAM: web:3000
+    ports:
+      - "${CONVERGEKIT_HTTP_PORT:-80}:80"
+      - "${CONVERGEKIT_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./docker/local/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./.local/certs:/certs:ro
+
+  db-migrate:
+    build:
+      context: .
+      dockerfile: packages/db/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-convergekit}:${POSTGRES_PASSWORD:-convergekit_secret}@postgres:5432/${POSTGRES_DB:-convergekit}
+      CONVERGEKIT_LOCAL_BOOTSTRAP_MANUAL_MIGRATIONS: "true"
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-convergekit}:${POSTGRES_PASSWORD:-convergekit_secret}@postgres:5432/${POSTGRES_DB:-convergekit}
+      REDIS_URL: redis://redis:6379
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change-me-to-a-random-32-char-string}
+      BETTER_AUTH_URL: https://convergekit-dev.local
+      API_BASE_URL: https://convergekit-dev.local
+      WEB_APP_URL: https://convergekit-dev.local
+      ALLOWED_ORIGINS: https://convergekit-dev.local
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@example.com}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      WORKFORCE_SSO_ENABLED: ${WORKFORCE_SSO_ENABLED:-false}
+      WORKFORCE_SSO_PROVIDER_LABEL: ${WORKFORCE_SSO_PROVIDER_LABEL:-Workforce SSO}
+      WORKFORCE_SAML_IDP_SSO_URL: ${WORKFORCE_SAML_IDP_SSO_URL:-}
+      WORKFORCE_SAML_IDP_ENTITY_ID: ${WORKFORCE_SAML_IDP_ENTITY_ID:-}
+      WORKFORCE_SAML_IDP_CERT: ${WORKFORCE_SAML_IDP_CERT:-}
+      WORKFORCE_SAML_SP_ENTITY_ID: ${WORKFORCE_SAML_SP_ENTITY_ID:-urn:convergekit:dev}
+      WORKFORCE_SAML_ACS_URL: ${WORKFORCE_SAML_ACS_URL:-https://convergekit-dev.local/api/auth/workforce-saml/acs}
+      WORKFORCE_SAML_START_URL: ${WORKFORCE_SAML_START_URL:-https://convergekit-dev.local/en/auth/sign-in}
+      CONVERGEKIT_SESSION_TTL_DAYS: ${CONVERGEKIT_SESSION_TTL_DAYS:-14}
+      ACCESS_ALLOWED_EMAIL_DOMAIN: ${ACCESS_ALLOWED_EMAIL_DOMAIN:-}
+      ACCESS_ALLOWED_GITHUB_ORG: ${ACCESS_ALLOWED_GITHUB_ORG:-}
+      ACCESS_ALLOWED_REPOSITORY_HOST: ${ACCESS_ALLOWED_REPOSITORY_HOST:-github.com}
+      ACCESS_SUPPORT_ADMIN_EMAILS: ${ACCESS_SUPPORT_ADMIN_EMAILS:-}
+      AI_PROVIDER: ${AI_PROVIDER:-openrouter}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      SERVER_API_URL: http://api:3001
+      NEXT_PUBLIC_API_URL: https://convergekit-dev.local
+      NEXT_PUBLIC_WEB_URL: https://convergekit-dev.local
+      DISABLE_LOCAL_API_PROXY: "true"
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-convergekit}:${POSTGRES_PASSWORD:-convergekit_secret}@postgres:5432/${POSTGRES_DB:-convergekit}
+      REDIS_URL: redis://redis:6379
+      WORKSPACE_DIR: /workspace
+      MAX_INDEX_FILE_BYTES: ${MAX_INDEX_FILE_BYTES:-524288}
+      INDEX_CHUNK_BATCH_SIZE: ${INDEX_CHUNK_BATCH_SIZE:-64}
+      AI_PROVIDER: ${AI_PROVIDER:-openrouter}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - worker_workspace:/workspace
+
+volumes:
+  worker_workspace:
