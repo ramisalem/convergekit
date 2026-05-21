@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest a new capability or improvement.
+title: "Feature: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for product, engineering, or agent-workflow improvements.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow is hard, missing, or unclear today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would make the workflow better?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other designs, tools, or workarounds you considered.
+    validations:
+      required: false
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: This affects product intent or repo guide behavior.
+        - label: This affects code indexing, wiki generation, or search.
+        - label: This affects chat, MCP, or agent context.
+        - label: This affects local development or deployment.

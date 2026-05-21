@@ -17,6 +17,23 @@ Before opening a pull request, run:
 make verify
 ```
 
+## Commits and Pull Requests
+
+- Use concise imperative commit subjects, such as `Add repository summary`.
+- Prefer Conventional Commits for feature and fix work: `feat:`, `fix:`,
+  `docs:`, `test:`, `refactor:`, `chore:`.
+- Keep one logical change per commit. Do not mix formatting-only changes with
+  behavior changes.
+- Pull requests are merged with a linear history. Use squash or rebase instead
+  of merge commits.
+- Branches are deleted after merge.
+
+## Versioning
+
+ConvergeKit follows SemVer for releases once public packages or tagged
+artifacts are published. Until the first public release, changes may land under
+the `0.x` line while APIs and deployment contracts settle.
+
 ## Style
 
 - Use TypeScript strict mode.
