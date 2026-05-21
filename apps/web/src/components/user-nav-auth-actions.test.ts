@@ -18,4 +18,12 @@ describe('user nav auth actions', () => {
     expect(source).not.toContain("user.role === 'admin' ? '/settings' : '#'")
     expect(source).not.toContain('href={settingsHref}')
   })
+
+  it('keeps personal OAuth photos out of the project chrome', () => {
+    const source = readSource('src/components/user-nav.tsx')
+
+    expect(source).not.toContain('user.image ?')
+    expect(source).not.toContain('<img')
+    expect(source).toContain('const initial =')
+  })
 })

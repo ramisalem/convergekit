@@ -1,5 +1,7 @@
 # ConvergeKit
 
+![ConvergeKit logo](.github/assets/convergekit-logo.svg)
+
 ConvergeKit brings product intent, code reality, and agent context together.
 
 It turns repositories into a shared evidence layer so product teams, engineers,

@@ -6,6 +6,7 @@ import {
   ConversationScrollButton,
 } from '@/components/ai-elements/conversation'
 import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message'
+import { ConvergeKitLogoMark } from '@/components/convergekit-logo'
 import {
   PromptInput,
   PromptInputSubmit,
@@ -319,9 +320,7 @@ export function ChatSessionView({
                   >
                     {isAssistant ? (
                       <>
-                        <span className="grid h-[22px] w-[22px] place-items-center rounded-md bg-gradient-to-br from-[#1d4ed8] to-[#6d28d9] text-[11px] font-bold text-white">
-                          CK
-                        </span>
+                        <ConvergeKitLogoMark className="h-[22px] w-[22px] bg-gradient-to-br" />
                         <span>ConvergeKit · Claude Sonnet 4.5</span>
                       </>
                     ) : (

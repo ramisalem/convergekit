@@ -1,4 +1,5 @@
 import { AdminNavLinks } from '@/components/admin-nav-links'
+import { ConvergeKitLogo } from '@/components/convergekit-logo'
 import { NavLinks } from '@/components/nav-links'
 import { UserNav } from '@/components/user-nav'
 import { useTranslations } from 'next-intl'
@@ -16,10 +17,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               href="/"
               className="flex items-center gap-2.5 text-sm font-semibold text-[var(--convergekit-ink)]"
             >
-              <span className="grid h-6 w-6 place-items-center rounded-md bg-[var(--convergekit-ink)] text-[10px] font-bold text-white">
-                CK
-              </span>
-              <span>{t('brand')}</span>
+              <ConvergeKitLogo labelClassName="text-[var(--convergekit-ink)]" />
             </a>
             <nav className="flex items-center gap-1">
               <NavLinks items={[{ href: '/repositories', label: t('repositories') }]} />

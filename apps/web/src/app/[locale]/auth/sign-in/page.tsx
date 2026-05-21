@@ -1,6 +1,7 @@
 'use client'
 
 import { GitHubSignInButton } from '@/components/github-sign-in-button'
+import { ConvergeKitLogoMark } from '@/components/convergekit-logo'
 import { WorkforceSsoSignInButton } from '@/components/workforce-sso-sign-in-button'
 import { authConfigApi } from '@/lib/api-client'
 import { getApiBaseUrl } from '@/lib/runtime-urls'
@@ -62,9 +63,7 @@ export default function SignInPage() {
       <div className="w-full max-w-[380px]">
         <div className="mb-[22px] flex items-center justify-center">
           <a href="/" aria-label="ConvergeKit home">
-            <span className="grid h-8 w-8 place-items-center rounded-md bg-[var(--convergekit-ink)] text-[13px] font-bold text-white">
-              CK
-            </span>
+            <ConvergeKitLogoMark className="h-9 w-9" />
           </a>
         </div>
 

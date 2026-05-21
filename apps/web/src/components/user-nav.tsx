@@ -75,17 +75,9 @@ export function UserNav() {
   const initial = (user.name?.[0] ?? user.email?.[0] ?? '?').toUpperCase()
   const profileContent = (
     <>
-      {user.image ? (
-        <img
-          src={user.image}
-          alt={user.name}
-          className="h-7 w-7 rounded-full object-cover ring-1 ring-[var(--convergekit-line)]"
-        />
-      ) : (
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--convergekit-ink)] text-xs font-semibold text-white">
-          {initial}
-        </div>
-      )}
+      <div className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--convergekit-line)] bg-[var(--convergekit-bg-3)] text-xs font-semibold text-[var(--convergekit-ink)]">
+        {initial}
+      </div>
       <span className="hidden text-sm font-medium text-[var(--convergekit-ink)] sm:block">
         {user.name}
       </span>
