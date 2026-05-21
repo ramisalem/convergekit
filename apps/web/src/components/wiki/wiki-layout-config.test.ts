@@ -26,20 +26,20 @@ describe('wiki-layout-config', () => {
     expect(shouldShowPageTocRail('mobile')).toBe(false)
   })
 
-  it('returns the wide docs-rail shell classes', () => {
+  it('returns the mockup wiki reader shell classes', () => {
     expect(getWikiLayoutClasses()).toEqual({
-      shell: 'mx-auto flex max-w-[1600px] gap-0 px-4 xl:px-6',
-      leftRail: 'wiki-left-rail w-[280px] xl:w-[320px] flex-shrink-0 py-8 pr-6 sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto',
-      contentWrap: 'min-w-0 flex-1 py-8 px-4 lg:px-6',
-      articleRow: 'mx-auto flex max-w-6xl gap-8 xl:gap-10',
-      article: 'min-w-0 flex-1 max-w-4xl',
-      pageToc: 'wiki-page-toc-rail sticky top-20 h-[calc(100vh-5rem)] w-[220px] flex-shrink-0 overflow-y-auto pt-1',
+      shell: 'wiki-reader-shell flex h-[calc(100vh-3.5rem)] bg-[var(--convergekit-bg)]',
+      leftRail: 'wiki-left-rail w-[260px] flex-shrink-0 overflow-y-auto border-r border-[var(--convergekit-line)] px-[14px] py-5',
+      contentWrap: 'min-w-0 flex-1',
+      articleRow: 'flex h-full min-h-0',
+      article: 'wiki-reader-article min-w-0 flex-1 overflow-y-auto px-5 py-8 lg:px-14',
+      pageToc: 'wiki-page-toc-rail w-[240px] flex-shrink-0 overflow-y-auto border-l border-[var(--convergekit-line)] px-[22px] py-8',
     })
   })
 
   it('keeps the page TOC visually subordinate to the left docs rail', () => {
     expect(getWikiLayoutClasses().pageToc).toBe(
-      'wiki-page-toc-rail sticky top-20 h-[calc(100vh-5rem)] w-[220px] flex-shrink-0 overflow-y-auto pt-1',
+      'wiki-page-toc-rail w-[240px] flex-shrink-0 overflow-y-auto border-l border-[var(--convergekit-line)] px-[22px] py-8',
     )
   })
 
@@ -50,6 +50,13 @@ describe('wiki-layout-config', () => {
     expect(getWikiLayoutClasses().pageToc).not.toContain('hidden')
     expect(globalsCssSource).toContain('.wiki-left-rail')
     expect(globalsCssSource).toContain('.wiki-page-toc-rail')
+    expect(globalsCssSource).toContain('.wiki-reader-article > *')
+  })
+
+  it('centers the reading column while keeping text left aligned inside it', () => {
+    expect(globalsCssSource).toContain('margin-left: auto;')
+    expect(globalsCssSource).toContain('margin-right: auto;')
+    expect(globalsCssSource).toContain('text-align: left;')
   })
 
   it('keeps rail class strings literal so build tooling can detect them during scanning', () => {

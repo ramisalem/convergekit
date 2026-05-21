@@ -13,4 +13,13 @@ describe('wiki rendering boundary', () => {
     expect(wikiPageContentSource).not.toContain("from 'fumadocs-ui")
     expect(wikiTocSource).not.toContain("from 'fumadocs-ui")
   })
+
+  it('lets rendered Mermaid diagrams open in a larger reader dialog', () => {
+    const mermaidDiagramSource = readSource('src/components/wiki/mermaid-diagram.tsx')
+
+    expect(mermaidDiagramSource).toContain('Open diagram')
+    expect(mermaidDiagramSource).toContain('role="dialog"')
+    expect(mermaidDiagramSource).toContain('aria-modal="true"')
+    expect(mermaidDiagramSource).toContain('mermaid-diagram-modal')
+  })
 })

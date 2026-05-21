@@ -76,6 +76,9 @@ jobs:
         run: |
           bash scripts/opensource-sanitization.test.sh
           bash scripts/package-scope.test.sh
+          bash scripts/local-env-parity.test.sh
+          bash scripts/dev-sh-compose-wrapper.test.sh
+          bash scripts/local-compose-config.test.sh
 
       - name: Test
         run: pnpm turbo test

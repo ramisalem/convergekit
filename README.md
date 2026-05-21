@@ -34,7 +34,7 @@ make install
 
 ```bash
 make compose:setup-host
-make compose:dev
+./dev.sh start
 ```
 
 This starts PostgreSQL, Redis, API, worker, web, and a local HTTPS reverse
@@ -49,15 +49,16 @@ make compose:prod
 This builds and runs the production Dockerfiles behind the local HTTPS reverse
 proxy. Use this before production-sensitive smoke tests.
 
-### Host Runtime
+### Advanced Host Runtime
 
 ```bash
 make docker:up
-make dev
+pnpm turbo dev
 ```
 
-This runs PostgreSQL and Redis in Docker while starting the API, worker, and web
-processes on the host.
+This runs only PostgreSQL and Redis in Docker while starting the API, worker,
+and web processes on the host. The default ConvergeKit dev flow is the
+containerized stack above.
 
 ### Minimal Local Flow
 
@@ -65,7 +66,7 @@ processes on the host.
 2. Fill in required provider keys. The default local provider is OpenRouter, so
    `OPENROUTER_API_KEY` is the normal key to set.
 3. Configure local HTTPS once with `make compose:setup-host`.
-4. Start the hot-reload Compose stack with `make compose:dev`.
+4. Start the hot-reload Compose stack with `./dev.sh start` or `make dev`.
 5. Open the web app at `https://convergekit-dev.local`.
 
 Local development mirrors production ingress shape: browser requests use the
@@ -110,7 +111,11 @@ CONVERGEKIT_SMOKE_EMAIL=user@example.com CONVERGEKIT_SMOKE_PASSWORD='password' m
 ## Commands
 
 ```bash
-make dev                 # Start all apps in watch mode
+make dev                 # Start the full hot-reload Docker Compose dev stack
+./dev.sh start           # Start the full Docker Compose dev stack
+./dev.sh status          # Show Docker Compose service status
+./dev.sh logs            # Tail Docker Compose logs
+./dev.sh stop            # Stop the full Docker Compose dev stack
 make compose:setup-host  # Add convergekit-dev.local and generate local TLS certs
 make compose:dev         # Start hot-reload Docker Compose stack behind HTTPS proxy
 make compose:prod        # Start production-like Docker Compose stack behind HTTPS proxy

@@ -5,6 +5,11 @@ import { trackRepositoryDetailEvent } from '@/lib/repository-analytics'
 import { Loader2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  ChatActivityRail,
+  EMPTY_CHAT_ACTIVITY_SNAPSHOT,
+  type ChatActivitySnapshot,
+} from './chat-activity-rail'
 import { sortChatSessions } from './chat-history-state'
 import { ChatSessionList } from './chat-session-list'
 import { ChatSessionView } from './chat-session-view'
@@ -57,6 +62,9 @@ export function ChatTab({ repositoryId, compatibility, embeddingProfile }: Props
   const [activeSessionError, setActiveSessionError] = useState<string | null>(null)
   const [sessionLoadRetryKey, setSessionLoadRetryKey] = useState(0)
   const [sessionError, setSessionError] = useState<string | null>(null)
+  const [activitySnapshot, setActivitySnapshot] = useState<ChatActivitySnapshot>(
+    EMPTY_CHAT_ACTIVITY_SNAPSHOT,
+  )
   const listRequestId = useRef(0)
   const newChatSelected = useRef(false)
   const currentRepositoryId = useRef(repositoryId)
@@ -133,6 +141,7 @@ export function ChatTab({ repositoryId, compatibility, embeddingProfile }: Props
     setLoadingSession(false)
     setActiveSessionError(null)
     setSessionError(null)
+    setActivitySnapshot(EMPTY_CHAT_ACTIVITY_SNAPSHOT)
   }, [repositoryId])
 
   useEffect(() => {
@@ -199,6 +208,7 @@ export function ChatTab({ repositoryId, compatibility, embeddingProfile }: Props
     setLoadingSession(false)
     setActiveSessionError(null)
     setSessionError(null)
+    setActivitySnapshot(EMPTY_CHAT_ACTIVITY_SNAPSHOT)
   }, [repositoryId])
 
   const handleSelectSession = useCallback(
@@ -219,6 +229,7 @@ export function ChatTab({ repositoryId, compatibility, embeddingProfile }: Props
       setActiveSessionId(sessionId)
       setInitialMessages([])
       setLoadingSession(true)
+      setActivitySnapshot(EMPTY_CHAT_ACTIVITY_SNAPSHOT)
     },
     [activeSessionError, activeSessionId],
   )
@@ -232,6 +243,7 @@ export function ChatTab({ repositoryId, compatibility, embeddingProfile }: Props
     setActiveSessionId(sessionId)
     setInitialMessages([])
     setActiveSessionError(null)
+    setActivitySnapshot(EMPTY_CHAT_ACTIVITY_SNAPSHOT)
   }, [])
 
   const handleSessionUpdated = useCallback(
@@ -268,6 +280,7 @@ export function ChatTab({ repositoryId, compatibility, embeddingProfile }: Props
           setActiveSessionId(remainingSessions[0]?.id ?? null)
           setInitialMessages([])
           setActiveSessionError(null)
+          setActivitySnapshot(EMPTY_CHAT_ACTIVITY_SNAPSHOT)
         }
 
         void refreshSessions(targetRepositoryId)
@@ -337,14 +350,15 @@ export function ChatTab({ repositoryId, compatibility, embeddingProfile }: Props
         initialMessages={visibleInitialMessages}
         onSessionCreated={handleSessionCreated}
         onSessionUpdated={handleSessionUpdated}
+        onActivitySnapshotChange={setActivitySnapshot}
         repositoryId={repositoryId}
       />
     )
 
   return (
     <div
-      className="grid min-h-[560px] gap-0 overflow-hidden rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white shadow-sm lg:grid-cols-[260px_minmax(0,1fr)_320px]"
-      style={{ height: 'calc(100vh - 230px)' }}
+      className="chat-pane-grid grid h-[calc(100vh_-_16rem)] min-h-[640px] w-full min-w-0 overflow-hidden border-b border-[var(--convergekit-line)] bg-[var(--convergekit-bg)]"
+      style={{ gridTemplateColumns: '260px minmax(0,1fr) 260px' }}
     >
       <ChatSessionList
         activeSessionId={visibleActiveSessionId}
@@ -355,17 +369,10 @@ export function ChatTab({ repositoryId, compatibility, embeddingProfile }: Props
         onSelectSession={handleSelectSession}
         sessions={visibleSessions}
       />
-      <div className="min-w-0 overflow-hidden">{mainPane}</div>
-      <aside className="hidden min-w-0 flex-col border-l border-[var(--convergekit-line)] bg-white lg:flex">
-        <div className="border-b border-[var(--convergekit-line-2)] px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--convergekit-ink-4)]">
-            Sources
-          </p>
-        </div>
-        <div className="flex flex-1 items-center justify-center px-6 text-center">
-          <p className="text-sm text-[var(--convergekit-ink-3)]">No sources yet</p>
-        </div>
-      </aside>
+      <div className="chat-center-column flex h-full min-h-0 min-w-0 justify-center overflow-hidden px-5 py-4">
+        <div className="flex h-full min-h-0 w-full overflow-hidden">{mainPane}</div>
+      </div>
+      <ChatActivityRail snapshot={activitySnapshot} />
     </div>
   )
 }

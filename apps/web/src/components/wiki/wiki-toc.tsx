@@ -56,14 +56,14 @@ export function WikiToc({ contentSelector = '[data-wiki-content]' }: Props) {
   return (
     <nav
       aria-label="On this page"
-      className="rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white px-4 py-4"
+      className="wiki-page-toc"
     >
-      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--convergekit-ink-4)]">
+      <p className="label-eyebrow mb-3">
         On this page
       </p>
-      <ul className="space-y-1">
+      <ul className="flex flex-col gap-1.5">
         {items.map((item) => (
-          <li key={item.id} style={{ paddingLeft: item.level === 3 ? '0.75rem' : '0' }}>
+          <li key={item.id}>
             <a
               href={`#${item.id}`}
               onClick={(e) => {
@@ -72,10 +72,11 @@ export function WikiToc({ contentSelector = '[data-wiki-content]' }: Props) {
                 setActiveId(item.id)
               }}
               className={cn(
-                'block text-sm leading-5 transition-colors',
+                'block border-l-2 py-0.5 text-[12.5px] leading-5 transition-colors',
+                item.level === 3 ? 'pl-3.5' : 'pl-2',
                 activeId === item.id
-                  ? 'font-medium text-[var(--convergekit-ink)]'
-                  : 'text-[var(--convergekit-ink-3)] hover:text-[var(--convergekit-ink)]',
+                  ? 'border-[var(--convergekit-ink)] font-semibold text-[var(--convergekit-ink)]'
+                  : 'border-transparent font-normal text-[var(--convergekit-ink-3)] hover:text-[var(--convergekit-ink)]',
               )}
             >
               {item.text}

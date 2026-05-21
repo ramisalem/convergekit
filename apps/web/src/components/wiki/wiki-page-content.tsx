@@ -8,6 +8,7 @@ import { CitationBadge } from './citation-badge'
 import { pathFromCitation } from './evidence-authority'
 import remarkGfm from 'remark-gfm'
 import { normalizeWikiMarkdown } from './normalize-wiki-markdown'
+import type { RelatedPageLink } from './related-pages'
 
 const MermaidDiagram = dynamic(
   () => import('./mermaid-diagram').then((m) => m.MermaidDiagram),
@@ -19,38 +20,39 @@ interface Props {
   /** Base path for relative wiki page links (e.g. "/en/repositories/abc/wiki") */
   wikiBasePath?: string
   sourceFileMetadata?: EvidenceSourceMetadata[]
+  relatedPages?: RelatedPageLink[]
 }
 
-export function WikiPageContent({ content, wikiBasePath, sourceFileMetadata }: Props) {
-  const normalizedContent = normalizeWikiMarkdown(content)
+export function WikiPageContent({ content, wikiBasePath, sourceFileMetadata, relatedPages = [] }: Props) {
+  const normalizedContent = normalizeWikiMarkdown(content, relatedPages)
   const metadataByPath = new Map((sourceFileMetadata ?? []).map((item) => [item.path, item]))
 
   return (
-    <div className="wiki-content max-w-none">
+    <div className="wiki-content">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
         components={{
           h1({ children }) {
-            return <h1 className="text-2xl font-bold tracking-tight text-neutral-900 mt-0 mb-4">{children}</h1>
+            return <h1 className="mb-1.5 mt-0 text-[32px] font-semibold leading-[1.15] tracking-normal text-[var(--convergekit-ink)]">{children}</h1>
           },
           h2({ children }) {
-            return <h2 className="text-lg font-semibold text-neutral-900 mt-10 mb-4 border-b border-neutral-200 pb-2">{children}</h2>
+            return <h2 className="mb-2.5 mt-8 text-[22px] font-semibold leading-[1.25] tracking-normal text-[var(--convergekit-ink)]">{children}</h2>
           },
           h3({ children }) {
-            return <h3 className="text-base font-medium text-neutral-800 mt-8 mb-3">{children}</h3>
+            return <h3 className="mb-1.5 mt-6 text-base font-semibold leading-snug text-[var(--convergekit-ink)]">{children}</h3>
           },
           p({ children }) {
-            return <p className="text-sm leading-relaxed text-neutral-700 my-3">{children}</p>
+            return <p className="my-3 text-[15.5px] leading-[1.55] text-[var(--convergekit-ink-2)]">{children}</p>
           },
           ul({ children }) {
-            return <ul className="my-3 space-y-1 list-disc pl-5">{children}</ul>
+            return <ul className="my-3 list-disc space-y-1 pl-5">{children}</ul>
           },
           ol({ children }) {
-            return <ol className="my-3 space-y-1 list-decimal pl-5">{children}</ol>
+            return <ol className="my-3 list-decimal space-y-1 pl-5">{children}</ol>
           },
           li({ children }) {
-            return <li className="text-sm text-neutral-700">{children}</li>
+            return <li className="text-[15px] leading-[1.55] text-[var(--convergekit-ink-2)]">{children}</li>
           },
           table({ children }) {
             return (
@@ -69,7 +71,7 @@ export function WikiPageContent({ content, wikiBasePath, sourceFileMetadata }: P
             return <td className="px-4 py-2.5 text-sm text-neutral-700 border-b border-neutral-100">{children}</td>
           },
           blockquote({ children }) {
-            return <blockquote className="border-l-4 border-neutral-200 pl-4 italic text-neutral-500 my-4">{children}</blockquote>
+            return <blockquote className="my-4 rounded-r-md border-l-[3px] border-[var(--convergekit-line-strong)] bg-[var(--convergekit-bg-2)] px-3.5 py-1 text-[var(--convergekit-ink-2)]">{children}</blockquote>
           },
           a({ href, children }) {
             // Detect citation pattern: [file.ext:line-line]() produces href="" with matching text
@@ -88,7 +90,7 @@ export function WikiPageContent({ content, wikiBasePath, sourceFileMetadata }: P
                 ? `${wikiBasePath}/${href}`
                 : href
             return (
-              <a href={resolvedHref} className="text-neutral-900 underline underline-offset-2 hover:opacity-70">
+              <a href={resolvedHref} className="text-[var(--convergekit-ink)] underline underline-offset-2 hover:opacity-70">
                 {children}
               </a>
             )

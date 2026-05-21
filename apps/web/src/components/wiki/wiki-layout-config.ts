@@ -33,8 +33,8 @@ const WIKI_LAYOUT_BREAKPOINTS = {
   pageTocVisibleFrom: WikiRailBreakpoint
 }
 
-const WIKI_LEFT_RAIL_CLASSES = 'wiki-left-rail w-[280px] xl:w-[320px] flex-shrink-0 py-8 pr-6 sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto'
-const WIKI_PAGE_TOC_CLASSES = 'wiki-page-toc-rail sticky top-20 h-[calc(100vh-5rem)] w-[220px] flex-shrink-0 overflow-y-auto pt-1'
+const WIKI_LEFT_RAIL_CLASSES = 'wiki-left-rail w-[260px] flex-shrink-0 overflow-y-auto border-r border-[var(--convergekit-line)] px-[14px] py-5'
+const WIKI_PAGE_TOC_CLASSES = 'wiki-page-toc-rail w-[240px] flex-shrink-0 overflow-y-auto border-l border-[var(--convergekit-line)] px-[22px] py-8'
 
 const WIKI_VIEWPORT_TIER_BREAKPOINTS = {
   mobile: null,
@@ -44,11 +44,11 @@ const WIKI_VIEWPORT_TIER_BREAKPOINTS = {
 
 const WIKI_LAYOUT_CONTRACT = {
   classes: {
-    shell: 'mx-auto flex max-w-[1600px] gap-0 px-4 xl:px-6',
+    shell: 'wiki-reader-shell flex h-[calc(100vh-3.5rem)] bg-[var(--convergekit-bg)]',
     leftRail: WIKI_LEFT_RAIL_CLASSES,
-    contentWrap: 'min-w-0 flex-1 py-8 px-4 lg:px-6',
-    articleRow: 'mx-auto flex max-w-6xl gap-8 xl:gap-10',
-    article: 'min-w-0 flex-1 max-w-4xl',
+    contentWrap: 'min-w-0 flex-1',
+    articleRow: 'flex h-full min-h-0',
+    article: 'wiki-reader-article min-w-0 flex-1 overflow-y-auto px-5 py-8 lg:px-14',
     pageToc: WIKI_PAGE_TOC_CLASSES,
   },
   rails: {

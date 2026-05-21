@@ -7,7 +7,7 @@ import { StatusChip } from '@/components/ui/status-chip'
 import { useUser } from '@/components/user-nav'
 import { ApiError, repositoriesApi } from '@/lib/api-client'
 import type { RepositoryResponse } from '@convergekit/types'
-import { ChevronRight, GitBranch, Plus, Search } from 'lucide-react'
+import { ChevronDown, ChevronRight, GitBranch, ListFilter, Plus, Search } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -20,33 +20,72 @@ function ProviderBadge({ provider }: { provider: RepositoryResponse['provider'] 
   )
 }
 
-function RepositoryRow({ repo }: { repo: RepositoryResponse }) {
-  const t = useTranslations('repositories')
+function formatCompactLoc(loc: number | null | undefined) {
+  if (loc === null || loc === undefined) return '— LOC'
+  return `${new Intl.NumberFormat('en', {
+    maximumFractionDigits: loc < 10_000 ? 1 : 0,
+    notation: 'compact',
+  }).format(loc)} LOC`
+}
 
+function formatChatCount(count: number | null | undefined) {
+  const safeCount = count ?? 0
+  return `${safeCount} ${safeCount === 1 ? 'chat' : 'chats'}`
+}
+
+function RepositoryActivity({ repo }: { repo: RepositoryResponse }) {
+  const indexedAt = repo.listSummary?.indexedAt ?? repo.indexedAt
+
+  if (repo.status === 'processing') {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shadow-[0_0_0_4px_rgba(245,158,11,0.18)]" />
+        Indexing now
+      </span>
+    )
+  }
+
+  if (repo.status === 'pending') return <>Queued</>
+  if (repo.status === 'failed') return <>Failed</>
+
+  return (
+    <>
+      Indexed <ClientTime iso={indexedAt} style="relative" fallback="-" />
+    </>
+  )
+}
+
+function RepositoryRow({ repo }: { repo: RepositoryResponse }) {
   return (
     <a
       href={`/repositories/${repo.id}`}
-      className="flex items-center justify-between rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white px-5 py-4 transition-colors hover:bg-[var(--convergekit-bg-2)]"
+      className="grid grid-cols-[28px_minmax(0,1.5fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-[var(--convergekit-line-2)] px-4 py-3 transition-colors last:border-b-0 hover:bg-[var(--convergekit-bg-2)]"
     >
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-[var(--convergekit-line)] bg-[var(--convergekit-bg-3)]">
-          <GitBranch className="h-4 w-4 text-[var(--convergekit-ink-3)]" />
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-[var(--convergekit-ink)]">
-            {repo.name}
-          </p>
-          <p className="truncate font-mono text-xs text-[var(--convergekit-ink-3)]">
-            {repo.cloneUrl}
-          </p>
-        </div>
+      <div className="grid h-7 w-7 place-items-center rounded-md bg-[var(--convergekit-bg-3)] text-[var(--convergekit-ink-3)]">
+        <GitBranch className="h-3.5 w-3.5" />
       </div>
-      <div className="ml-6 flex flex-shrink-0 items-center gap-4">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-[var(--convergekit-ink)]">
+          {repo.name}
+        </p>
+        <p className="truncate font-mono text-xs text-[var(--convergekit-ink-3)]">
+          {repo.cloneUrl}
+        </p>
+      </div>
+      <div className="min-w-0 flex flex-col gap-0.5">
+        <p className="truncate text-[12.5px] text-[var(--convergekit-ink-2)]">
+          {repo.listSummary?.primaryLanguage ?? 'Unknown'}
+        </p>
+        <p className="truncate text-xs text-[var(--convergekit-ink-4)]">
+          {formatCompactLoc(repo.listSummary?.loc)} · {formatChatCount(repo.listSummary?.chatCount)}
+        </p>
+      </div>
+      <div className="text-right text-[12.5px] text-[var(--convergekit-ink-3)]">
+        <RepositoryActivity repo={repo} />
+      </div>
+      <div className="flex items-center gap-2">
         <ProviderBadge provider={repo.provider} />
         <StatusChip status={repo.status} />
-        <span className="hidden text-xs text-[var(--convergekit-ink-3)] sm:block">
-          {t('lastIndexed')}: <ClientTime iso={repo.updatedAt} fallback="-" />
-        </span>
         <ChevronRight className="h-4 w-4 text-[var(--convergekit-ink-4)]" />
       </div>
     </a>
@@ -173,7 +212,7 @@ export default function RepositoriesPage() {
 
   return (
     <>
-      <div className="mx-auto max-w-[88rem] px-5 py-8">
+      <div className="mx-auto max-w-[1100px] px-5 py-8">
         <PageHeader
           eyebrow="Workspace"
           title={t('title')}
@@ -192,20 +231,20 @@ export default function RepositoriesPage() {
         ) : repositories.length === 0 ? (
           <div className="mt-6">
             {isAdmin ? (
-            <EmptyState onAdd={() => setDialogOpen(true)} />
-          ) : (
-            <NoRepositoriesAssignedState
-              supportContacts={user?.supportContacts ?? []}
-              title={t('emptyAssignedTitle')}
-              description={t('emptyAssignedDescription')}
-              contactsLabel={t('emptyAssignedContactsLabel')}
-            />
+              <EmptyState onAdd={() => setDialogOpen(true)} />
+            ) : (
+              <NoRepositoriesAssignedState
+                supportContacts={user?.supportContacts ?? []}
+                title={t('emptyAssignedTitle')}
+                description={t('emptyAssignedDescription')}
+                contactsLabel={t('emptyAssignedContactsLabel')}
+              />
             )}
           </div>
         ) : (
-          <div className="mt-6 space-y-3">
-            <div className="flex flex-col gap-3 rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white p-3 md:flex-row md:items-center">
-              <label className="relative min-w-0 flex-1">
+          <div className="mt-6">
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <label className="relative min-w-64 flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--convergekit-ink-4)]" />
                 <input
                   value={query}
@@ -214,35 +253,46 @@ export default function RepositoriesPage() {
                   className="h-9 w-full rounded-md border border-[var(--convergekit-line)] bg-white pl-9 pr-3 text-sm text-[var(--convergekit-ink)] outline-none focus:border-[var(--convergekit-focus)] focus:ring-2 focus:ring-[var(--convergekit-focus)]/15"
                 />
               </label>
-              <select
-                value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(event.target.value as 'all' | RepositoryResponse['status'])
-                }
-                className="h-9 rounded-md border border-[var(--convergekit-line)] bg-white px-3 text-sm text-[var(--convergekit-ink-2)] outline-none focus:border-[var(--convergekit-focus)]"
-              >
-                <option value="all">All statuses</option>
-                <option value="pending">{t('status.pending')}</option>
-                <option value="processing">{t('status.processing')}</option>
-                <option value="done">{t('status.done')}</option>
-                <option value="failed">{t('status.failed')}</option>
-              </select>
-              <select
-                value={providerFilter}
-                onChange={(event) =>
-                  setProviderFilter(event.target.value as 'all' | RepositoryResponse['provider'])
-                }
-                className="h-9 rounded-md border border-[var(--convergekit-line)] bg-white px-3 text-sm text-[var(--convergekit-ink-2)] outline-none focus:border-[var(--convergekit-focus)]"
-              >
-                <option value="all">All providers</option>
-                <option value="github">GitHub</option>
-              </select>
+              <label className="relative shrink-0">
+                <ListFilter className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--convergekit-ink-4)]" />
+                <select
+                  value={statusFilter}
+                  onChange={(event) =>
+                    setStatusFilter(event.target.value as 'all' | RepositoryResponse['status'])
+                  }
+                  className="h-9 shrink-0 appearance-none rounded-md border border-[var(--convergekit-line)] bg-white pl-8 pr-8 text-sm text-[var(--convergekit-ink-2)] outline-none focus:border-[var(--convergekit-focus)]"
+                >
+                  <option value="all">All statuses</option>
+                  <option value="pending">{t('status.pending')}</option>
+                  <option value="processing">{t('status.processing')}</option>
+                  <option value="done">{t('status.done')}</option>
+                  <option value="failed">{t('status.failed')}</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--convergekit-ink-4)]" />
+              </label>
+              <label className="relative shrink-0">
+                <GitBranch className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--convergekit-ink-4)]" />
+                <select
+                  value={providerFilter}
+                  onChange={(event) =>
+                    setProviderFilter(event.target.value as 'all' | RepositoryResponse['provider'])
+                  }
+                  className="h-9 shrink-0 appearance-none rounded-md border border-[var(--convergekit-line)] bg-white pl-8 pr-8 text-sm text-[var(--convergekit-ink-2)] outline-none focus:border-[var(--convergekit-focus)]"
+                >
+                  <option value="all">All providers</option>
+                  <option value="github">GitHub</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--convergekit-ink-4)]" />
+              </label>
             </div>
-            {filteredRepositories.map((repo) => (
-              <RepositoryRow key={repo.id} repo={repo} />
-            ))}
-            {filteredRepositories.length === 0 && (
-              <div className="rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white px-6 py-12 text-center text-sm text-[var(--convergekit-ink-3)]">
+            {filteredRepositories.length > 0 ? (
+              <div className="mt-3 overflow-hidden rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white">
+                {filteredRepositories.map((repo) => (
+                  <RepositoryRow key={repo.id} repo={repo} />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-3 rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white px-6 py-12 text-center text-sm text-[var(--convergekit-ink-3)]">
                 No repositories match the current filters.
               </div>
             )}

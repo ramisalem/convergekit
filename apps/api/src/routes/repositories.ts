@@ -2,6 +2,7 @@ import { accessPolicyConfig, assertAllowedAccessPolicyRepository } from '@conver
 import {
   account,
   branches,
+  chatSessions,
   db,
   documents,
   getUserAiSettings,
@@ -54,11 +55,13 @@ import {
   revokeActiveMcpTokensForRepository,
 } from '../lib/mcp-token-security.js'
 import { getRepositoryGuideSummary } from '../lib/repo-guide.js'
+import { buildRepositoryListSummaryMap } from '../lib/repository-list-summary.js'
 import { serializeRepositoryForResponse } from '../lib/repository-response.js'
 import { assertRepoAccess, assertRepoAdminAction, scopedRepositoryIds } from '../lib/scoping.js'
 
 export const repositoryRoutes = new Hono()
 const MINDMAP_PATH = '__mindmap__'
+const lineCountSql = sql<number>`coalesce(sum(case when ${documents.content} = '' then 0 else length(${documents.content}) - length(replace(${documents.content}, ${'\n'}, '')) + 1 end), 0)::int`
 
 function parseScopes(scope: string | null | undefined): Set<string> {
   if (!scope) return new Set()
@@ -169,7 +172,56 @@ repositoryRoutes.get('/', async (c) => {
     )
     .orderBy(desc(repositories.createdAt))
 
-  return c.json({ repositories: repos.map(serializeRepositoryForResponse) })
+  const repositoryIds = repos.map((repo) => repo.id)
+  if (repositoryIds.length === 0) {
+    return c.json({ repositories: [] })
+  }
+
+  const [documentStats, branchStats, chatCounts] = await Promise.all([
+    db
+      .select({
+        repositoryId: branches.repositoryId,
+        programmingLanguage: documents.programmingLanguage,
+        fileCount: sql<number>`count(*)::int`,
+        loc: lineCountSql,
+      })
+      .from(documents)
+      .innerJoin(branches, eq(documents.branchId, branches.id))
+      .where(and(inArray(branches.repositoryId, repositoryIds), sql`${documents.path} <> ${MINDMAP_PATH}`))
+      .groupBy(branches.repositoryId, documents.programmingLanguage),
+    db
+      .select({
+        repositoryId: branches.repositoryId,
+        indexedAt: branches.lastIndexedAt,
+      })
+      .from(branches)
+      .where(inArray(branches.repositoryId, repositoryIds)),
+    db
+      .select({
+        repositoryId: chatSessions.repositoryId,
+        chatCount: sql<number>`count(${chatSessions.id})::int`,
+      })
+      .from(chatSessions)
+      .where(and(eq(chatSessions.userId, userId), inArray(chatSessions.repositoryId, repositoryIds)))
+      .groupBy(chatSessions.repositoryId),
+  ])
+  const summaries = buildRepositoryListSummaryMap({
+    repositoryIds,
+    documentStats,
+    branchStats,
+    chatCounts,
+  })
+
+  return c.json({
+    repositories: repos.map((repo) => {
+      const listSummary = summaries.get(repo.id)
+      return {
+        ...serializeRepositoryForResponse(repo),
+        indexedAt: listSummary?.indexedAt ?? null,
+        listSummary: summaries.get(repo.id),
+      }
+    }),
+  })
 })
 
 /**

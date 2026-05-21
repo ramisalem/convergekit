@@ -173,7 +173,7 @@ export default function RepositoryDetailPage({ params }: Props) {
 
   if (!repo && loading) {
     return (
-      <div className="mx-auto max-w-[88rem] px-5 py-8">
+      <div className="mx-auto max-w-[1500px] px-5 py-8">
         <div className="h-5 w-40 animate-pulse rounded bg-[var(--convergekit-bg-3)]" />
         <div className="mt-6 h-8 w-64 animate-pulse rounded bg-[var(--convergekit-bg-3)]" />
         <div className="mt-8 h-48 animate-pulse rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white" />
@@ -183,7 +183,7 @@ export default function RepositoryDetailPage({ params }: Props) {
 
   if (loadError) {
     return (
-      <div className="mx-auto max-w-[88rem] px-5 py-8">
+      <div className="mx-auto max-w-[1500px] px-5 py-8">
         <a
           href="/repositories"
           className="inline-flex items-center gap-1.5 text-sm text-[var(--convergekit-ink-3)] transition-colors hover:text-[var(--convergekit-ink)]"
@@ -199,112 +199,110 @@ export default function RepositoryDetailPage({ params }: Props) {
   }
 
   return (
-    <div
-      className={cn(
-        'mx-auto px-5 py-8',
-        effectiveActiveTab === 'chat' ? 'max-w-[88rem]' : 'max-w-[72rem]',
-      )}
-    >
-      {/* Breadcrumb */}
-      <a
-        href="/repositories"
-        className="inline-flex items-center gap-1.5 text-sm text-[var(--convergekit-ink-3)] transition-colors hover:text-[var(--convergekit-ink)]"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        {t('backToRepositories')}
-      </a>
+    <div className="repository-detail-workspace-frame mx-auto w-full max-w-[1500px] px-5 py-8">
+      <div className="repository-detail-chrome">
+        {/* Breadcrumb */}
+        <a
+          href="/repositories"
+          className="inline-flex items-center gap-1.5 text-sm text-[var(--convergekit-ink-3)] transition-colors hover:text-[var(--convergekit-ink)]"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {t('backToRepositories')}
+        </a>
 
-      {/* Header */}
-      <div className="mt-4 flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-md border border-[var(--convergekit-line)] bg-white">
-              <GitBranch className="h-4 w-4 text-[var(--convergekit-ink-3)]" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <h1 className="m-0 truncate text-[26px] font-semibold leading-tight text-[var(--convergekit-ink)]">
-                  {name}
-                </h1>
-                <StatusChip status={status as RepositoryResponse['status']} />
+        {/* Header */}
+        <div className="repository-detail-header-grid mt-4 grid w-full items-start gap-4 text-left">
+          <div className="min-w-0 justify-self-start">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-md border border-[var(--convergekit-line)] bg-white">
+                <GitBranch className="h-4 w-4 text-[var(--convergekit-ink-3)]" />
               </div>
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-[var(--convergekit-ink-3)]">
-                <span className="capitalize">{provider}</span>
-                <span className="font-mono">{repo?.defaultBranch ?? 'main'}</span>
-                <span>
-                  Last indexed: <ClientTime iso={repo?.indexedAt ?? repo?.updatedAt} fallback="-" />
-                </span>
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <h1 className="m-0 truncate text-[26px] font-semibold leading-tight text-[var(--convergekit-ink)]">
+                    {name}
+                  </h1>
+                  <StatusChip status={status as RepositoryResponse['status']} />
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-[var(--convergekit-ink-3)]">
+                  <span className="capitalize">{provider}</span>
+                  <span className="font-mono">{repo?.defaultBranch ?? 'main'}</span>
+                  <span>
+                    Last indexed:{' '}
+                    <ClientTime iso={repo?.indexedAt ?? repo?.updatedAt} fallback="-" />
+                  </span>
+                </div>
               </div>
             </div>
           </div>
+          {status === 'done' && (
+            <a
+              href={`/${locale}/repositories/${id}/wiki`}
+              className="repository-detail-view-wiki inline-flex h-10 justify-self-start items-center justify-center gap-2 rounded-md bg-[var(--convergekit-ink)] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[var(--convergekit-ink-2)] md:justify-self-end"
+            >
+              <BookOpen className="h-4 w-4" />
+              {t('viewWiki')}
+            </a>
+          )}
         </div>
-        {status === 'done' && (
-          <a
-            href={`/${locale}/repositories/${id}/wiki`}
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-[var(--convergekit-line)] bg-white px-3 text-sm font-medium text-[var(--convergekit-ink-2)] transition-colors hover:bg-[var(--convergekit-bg-3)]"
-          >
-            <BookOpen className="h-3.5 w-3.5" />
-            {t('viewWiki')}
-          </a>
-        )}
-      </div>
 
-      {isAdmin && embeddingCompatibility && !embeddingCompatibility.compatible && (
-        <div className="mt-6 flex items-start justify-between gap-4 rounded-[var(--convergekit-radius-lg)] border border-amber-200 bg-amber-50 px-4 py-3">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-            <div>
-              <p className="text-sm font-medium text-amber-900">Embedding profile mismatch</p>
-              <p className="mt-1 text-sm text-amber-800">{embeddingCompatibility.message}</p>
-              {embeddingProfile && (
-                <p className="mt-1 text-xs text-amber-700">
-                  Indexed profile: {embeddingProfile.model} ({embeddingProfile.dimensions} dims)
-                </p>
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleReindex}
-            disabled={isReindexing}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-amber-900 px-3 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-60"
-          >
-            <RefreshCw className={cn('h-3.5 w-3.5', isReindexing && 'animate-spin')} />
-            Reindex with current settings
-          </button>
-        </div>
-      )}
-
-      {/* Tabs + Wiki link */}
-      <div className="mt-6 border-b border-[var(--convergekit-line)]">
-        <div className="flex items-end justify-between">
-          <nav className="flex gap-1">
-            {availableTabs.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => {
-                  setActiveTab(tab)
-                  trackRepositoryDetailEvent({
-                    name: 'repository_tab_change',
-                    repositoryId: id,
-                    tab,
-                  })
-                }}
-                className={cn(
-                  '-mb-px border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors',
-                  effectiveActiveTab === tab
-                    ? 'border-[var(--convergekit-ink)] text-[var(--convergekit-ink)]'
-                    : 'border-transparent text-[var(--convergekit-ink-3)] hover:border-[var(--convergekit-line-strong)] hover:text-[var(--convergekit-ink)]',
+        {isAdmin && embeddingCompatibility && !embeddingCompatibility.compatible && (
+          <div className="mt-6 flex items-start justify-between gap-4 rounded-[var(--convergekit-radius-lg)] border border-amber-200 bg-amber-50 px-4 py-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <div>
+                <p className="text-sm font-medium text-amber-900">Embedding profile mismatch</p>
+                <p className="mt-1 text-sm text-amber-800">{embeddingCompatibility.message}</p>
+                {embeddingProfile && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Indexed profile: {embeddingProfile.model} ({embeddingProfile.dimensions} dims)
+                  </p>
                 )}
-              >
-                {t(`tabs.${tab}`)}
-              </button>
-            ))}
-          </nav>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleReindex}
+              disabled={isReindexing}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-amber-900 px-3 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-60"
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5', isReindexing && 'animate-spin')} />
+              Reindex with current settings
+            </button>
+          </div>
+        )}
+
+        {/* Tabs + Wiki link */}
+        <div className="mt-6 border-b border-[var(--convergekit-line)]">
+          <div className="flex items-end justify-between">
+            <nav className="flex gap-1">
+              {availableTabs.map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => {
+                    setActiveTab(tab)
+                    trackRepositoryDetailEvent({
+                      name: 'repository_tab_change',
+                      repositoryId: id,
+                      tab,
+                    })
+                  }}
+                  className={cn(
+                    '-mb-px border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors',
+                    effectiveActiveTab === tab
+                      ? 'border-[var(--convergekit-ink)] text-[var(--convergekit-ink)]'
+                      : 'border-transparent text-[var(--convergekit-ink-3)] hover:border-[var(--convergekit-line-strong)] hover:text-[var(--convergekit-ink)]',
+                  )}
+                >
+                  {t(`tabs.${tab}`)}
+                </button>
+              ))}
+            </nav>
+          </div>
         </div>
       </div>
 
-      <div>
+      <div className="repository-detail-tab-frame">
         {effectiveActiveTab === 'docs' && (
           <DocsTab
             repositoryId={id}

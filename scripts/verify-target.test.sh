@@ -18,6 +18,10 @@ assert_file_contains() {
 
 assert_file_contains 'bash scripts/local-env-parity.test.sh' \
   'verify runs local environment parity checks'
+assert_file_contains 'bash scripts/dev-sh-compose-wrapper.test.sh' \
+  'verify runs the compose-first dev.sh contract'
+assert_file_contains 'bash scripts/local-compose-config.test.sh' \
+  'verify validates Compose config files'
 assert_file_contains 'bash scripts/opensource-sanitization.test.sh' \
   'verify checks for stale private product identity'
 assert_file_contains 'bash scripts/package-scope.test.sh' \

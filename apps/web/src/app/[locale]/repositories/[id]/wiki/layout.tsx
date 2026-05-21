@@ -1,13 +1,13 @@
 import { getWikiLayoutClasses } from '@/components/wiki/wiki-layout-config'
 import { WikiSidebar } from '@/components/wiki/wiki-sidebar'
-import { getWebBaseUrl } from '@/lib/runtime-urls'
+import { getApiBaseUrl } from '@/lib/runtime-urls'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { use } from 'react'
 
 export const dynamic = 'force-dynamic'
 
-const WEB_URL = getWebBaseUrl()
+const API_URL = getApiBaseUrl()
 
 interface Props {
   children: React.ReactNode
@@ -19,7 +19,7 @@ async function fetchWithCookies<T>(url: string, locale: string): Promise<T | nul
   const cookieHeader = cookieStore.toString()
   let res: Response
   try {
-    res = await fetch(`${WEB_URL}${url}`, {
+    res = await fetch(`${API_URL}${url}`, {
       headers: { cookie: cookieHeader },
       cache: 'no-store',
     })

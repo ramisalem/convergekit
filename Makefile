@@ -21,7 +21,7 @@ help:
 	@echo "ConvergeKit — available targets:"
 	@echo ""
 	@echo "  Development"
-	@echo "    make dev           Start all apps in watch mode (web, api, worker)"
+	@echo "    make dev           Start the full hot-reload Docker Compose dev stack"
 	@echo "    make install       Install all pnpm dependencies"
 	@echo ""
 	@echo "  Code quality"
@@ -59,8 +59,8 @@ help:
 install: ## Install all pnpm workspace dependencies
 	pnpm install
 
-dev: ## Start all apps in parallel watch mode
-	pnpm turbo dev
+dev: ## Start the full hot-reload Docker Compose dev stack
+	./dev.sh start
 
 # ─── Code quality ─────────────────────────────────────────────────────────────
 
@@ -81,6 +81,8 @@ verify: ## Run the local pre-PR verification gate
 	bash scripts/package-scope.test.sh
 	bash scripts/local-env-parity.test.sh
 	bash scripts/ci-workflow.test.sh
+	bash scripts/dev-sh-compose-wrapper.test.sh
+	bash scripts/local-compose-config.test.sh
 	pnpm turbo test
 	pnpm turbo typecheck
 	pnpm turbo lint
@@ -109,7 +111,7 @@ compose\:prod: ## Start production-like app containers behind the local HTTPS pr
 	$(DOCKER_COMPOSE_LOCAL) up -d --build --wait
 
 compose\:dev: ## Start hot-reload app containers behind the local HTTPS proxy
-	$(DOCKER_COMPOSE_DEV) up --build
+	$(DOCKER_COMPOSE_DEV) up -d --build --wait
 
 compose\:down: ## Stop and remove the full local Compose stack
 	$(DOCKER_COMPOSE_DEV) down

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildQuestionCards,
   buildQuestionStarters,
   computeAreaIntents,
   getAreaConfidenceLabel,
+  getAreaPathHint,
   pickStrongestArea,
   resolveGuideFiles,
   resolveMindMapStatus,
@@ -268,6 +270,91 @@ describe('buildQuestionStarters', () => {
     expect(starters.find((starter) => starter.intent === 'historical')?.examplePrompt).toBe(
       'Why was Authentication designed this way? Separate current code from design or history docs.',
     )
+  })
+})
+
+describe('getAreaPathHint', () => {
+  it('summarizes the shared source path for an area', () => {
+    expect(
+      getAreaPathHint(
+        area({
+          files: [
+            { path: 'apps/api/src/routes/auth.ts', evidenceTier: 'A', evidenceKind: 'code' },
+            { path: 'apps/api/src/routes/users.ts', evidenceTier: 'B', evidenceKind: 'test' },
+          ],
+        }),
+      ),
+    ).toBe('apps/api/src/routes')
+  })
+
+  it('falls back to mixed paths when files do not share a deep directory', () => {
+    expect(
+      getAreaPathHint(
+        area({
+          files: [
+            { path: 'apps/api/src/routes/auth.ts', evidenceTier: 'A', evidenceKind: 'code' },
+            { path: 'docs/adr/auth.md', evidenceTier: 'D', evidenceKind: 'adr' },
+          ],
+        }),
+      ),
+    ).toBe('mixed paths')
+  })
+})
+
+describe('buildQuestionCards', () => {
+  it('builds mockup-ready confidence cards from area evidence', () => {
+    const cards = buildQuestionCards([
+      area({
+        name: 'Authentication',
+        files: [
+          { path: 'apps/api/src/routes/auth.ts', evidenceTier: 'A', evidenceKind: 'code' },
+          { path: 'apps/api/src/routes/session.ts', evidenceTier: 'A', evidenceKind: 'code' },
+          { path: 'apps/api/src/routes/auth.test.ts', evidenceTier: 'B', evidenceKind: 'test' },
+        ],
+      }),
+      area({
+        name: 'Deployment',
+        files: [
+          { path: 'docs/deploy.md', evidenceTier: 'C', evidenceKind: 'setup_doc' },
+          { path: 'docker/compose.yaml', evidenceTier: 'A', evidenceKind: 'config' },
+        ],
+      }),
+    ])
+
+    expect(cards[0]).toMatchObject({
+      question: 'Where is Authentication implemented, and which files prove it?',
+      confidence: 5,
+      route: 'Code + Tests',
+      primaryTier: 'A',
+      secondaryTier: 'B',
+      alignment: 'ok',
+      generatedFromArea: 'Authentication',
+    })
+    expect(cards[0]?.rationale).toContain('Authentication')
+    expect(cards[0]?.sources).toEqual([
+      { tier: 'A', label: 'auth.ts', count: 1 },
+      { tier: 'A', label: 'session.ts', count: 1 },
+      { tier: 'B', label: 'auth.test.ts', count: 1 },
+    ])
+  })
+
+  it('marks weak documentation-only cards as stale or conflicting', () => {
+    const cards = buildQuestionCards([
+      area({
+        name: 'Historical decisions',
+        files: [
+          { path: 'docs/adr/auth.md', evidenceTier: 'D', evidenceKind: 'adr' },
+          { path: 'docs/rationale/auth.md', evidenceTier: 'D', evidenceKind: 'design_doc' },
+        ],
+      }),
+    ])
+
+    expect(cards[0]).toMatchObject({
+      confidence: 2,
+      primaryTier: 'D',
+      secondaryTier: null,
+      alignment: 'stale',
+    })
   })
 })
 
