@@ -1,0 +1,42 @@
+name: Bug report
+description: Report something that is broken or behaving unexpectedly.
+title: "Bug: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve ConvergeKit. Please include enough detail for someone else to reproduce the issue.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: List the smallest set of steps that triggers the issue.
+      placeholder: |
+        1. Start the local stack with ...
+        2. Open ...
+        3. Click ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, browser, Node.js, pnpm, Docker, and ConvergeKit version or commit.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste relevant logs, screenshots, or terminal output. Remove secrets first.
+      render: shell
+    validations:
+      required: false
