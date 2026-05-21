@@ -28,6 +28,8 @@ assert_file_contains 'WORKFORCE_SAML_SP_ENTITY_ID: urn:convergekit:ci' \
   'workflow uses the public SAML service-provider entity identifier'
 assert_file_contains 'bash scripts/opensource-sanitization.test.sh' \
   'workflow runs the public identity guard'
+assert_file_contains 'sudo apt-get install -y ripgrep' \
+  'workflow installs ripgrep before running guard scripts'
 assert_file_contains 'bash scripts/package-scope.test.sh' \
   'workflow runs the package scope guard'
 assert_file_contains 'bash scripts/local-env-parity.test.sh' \
