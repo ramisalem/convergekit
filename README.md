@@ -6,17 +6,69 @@ ConvergeKit brings product intent, code reality, and agent context together.
 
 It turns repositories into a shared evidence layer so product teams, engineers,
 and AI agents can work from the same understanding. ConvergeKit indexes code,
-generates structured wiki content, supports chat over repository context, and
-exposes repository knowledge through a web UI, REST API, background workers, and
-MCP.
+classifies and ranks the files that matter, generates structured wiki content,
+supports chat over repository context, and exposes repository knowledge through
+a web UI, REST API, background workers, and MCP.
+
+## The Skim
+
+ConvergeKit helps an engineering organization converge around what the product
+is meant to do, what the code actually does, and what AI agents need to know
+before they act.
+
+- **Index** a repository into searchable files, chunks, branches, and generated
+  pages.
+- **Classify** code, tests, docs, config, and product evidence into ranked
+  tiers so the strongest source files rise first.
+- **Rerank** evidence for each wiki page, guide question, chat answer, and MCP
+  response instead of treating every match as equal.
+- **Publish** the result as a wiki, repository guide, code chat, and scoped MCP
+  server for tools such as Claude Desktop and Cursor.
 
 ## What It Does
 
-- Ingests Git repositories and tracks branches, documents, chunks, and generated wiki pages.
-- Uses background workers to clone repositories, chunk code, build embeddings, and keep documentation up to date.
-- Powers a Next.js web app for repository browsing, chat, and wiki-style documentation.
-- Exposes repository knowledge through an API and Model Context Protocol server.
+- Ingests Git repositories and tracks branches, documents, chunks, classified
+  evidence, and generated wiki pages.
+- Uses background workers to clone repositories, chunk code, build embeddings,
+  classify files, rerank evidence, and keep documentation up to date.
+- Powers a Next.js web app for repository browsing, file inspection, chat, and
+  wiki-style documentation.
+- Exposes repository knowledge through an API and scoped Model Context Protocol
+  server.
 - Uses PostgreSQL, pgvector, and Redis to support search, queues, and real-time workflows.
+
+## Screenshots
+
+### Evidence-ranked Wiki
+
+The wiki is generated from repository context and keeps the source evidence near
+the page. Ranked files make it clear which code, tests, docs, and config back a
+piece of documentation.
+
+![ConvergeKit evidence-ranked wiki reader](docs/assets/screenshots/wiki-evidence-reader.jpg)
+
+### Repository Guide Classification
+
+The guide view groups the repository by functional areas, ranks source coverage,
+and turns that evidence map into high-confidence questions for product and
+engineering review.
+
+![ConvergeKit repository guide classification](docs/assets/screenshots/repo-guide-classification.jpg)
+
+### Chat With Agent Activity
+
+Chat answers stay grounded in repository evidence. The side rail shows the
+files the search agent used so humans and AI agents can audit the answer path.
+
+![ConvergeKit chat with search agent activity](docs/assets/screenshots/chat-agent-activity.jpg)
+
+### MCP Client Configuration
+
+Repository knowledge can be exposed to external AI clients through scoped MCP
+tokens. ConvergeKit generates client-specific setup snippets for Claude
+Desktop, Cursor, and generic JSON clients.
+
+![ConvergeKit MCP client configuration](docs/assets/screenshots/mcp-client-config.jpg)
 
 ## Quick Start
 
