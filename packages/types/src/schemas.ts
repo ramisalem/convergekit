@@ -38,6 +38,12 @@ export const repositoryResponseSchema = z.object({
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   indexedAt: z.string().datetime().nullable().optional(),
+  listSummary: z.object({
+    primaryLanguage: z.string().nullable(),
+    loc: z.number().int().nonnegative().nullable(),
+    chatCount: z.number().int().nonnegative(),
+    indexedAt: z.string().datetime().nullable(),
+  }).optional(),
   embeddingProfile: embeddingProfileSchema.nullable().optional(),
   embeddingCompatibility: embeddingCompatibilitySchema.nullable().optional(),
 })
@@ -82,6 +88,7 @@ export const repositoryGuideSummarySchema = z.object({
         'Gated history',
         'Limited',
       ]),
+      pathHint: z.string().nullable(),
       evidenceShare: z.array(
         z.object({
           tier: evidenceTierSchema,
@@ -99,6 +106,26 @@ export const repositoryGuideSummarySchema = z.object({
       evidenceLabels: z.array(evidenceLabelSchema),
       examplePrompt: z.string(),
       generatedFromArea: z.string().optional(),
+    }),
+  ),
+  questionCards: z.array(
+    z.object({
+      intent: retrievalIntentSchema,
+      question: z.string(),
+      confidence: z.number().int().min(1).max(5),
+      route: z.string(),
+      primaryTier: evidenceTierSchema,
+      secondaryTier: evidenceTierSchema.nullable(),
+      rationale: z.string(),
+      alignment: z.enum(['ok', 'stale', 'conflict']),
+      generatedFromArea: z.string(),
+      sources: z.array(
+        z.object({
+          tier: evidenceTierSchema,
+          label: z.string(),
+          count: z.number().int().positive(),
+        }),
+      ),
     }),
   ),
   skippedSummary: z.array(

@@ -55,6 +55,9 @@ vi.mock('@convergekit/db', () => ({
     userId: 'account.userId',
     providerId: 'account.providerId',
   },
+  documents: {
+    content: 'documents.content',
+  },
   db: {
     query: {
       account: {
@@ -106,6 +109,7 @@ vi.mock('drizzle-orm', () => ({
   eq: (_column: unknown, value: unknown) => value,
   and: (...values: unknown[]) => values.find(Boolean),
   isNull: () => true,
+  sql: vi.fn(() => 'sql'),
 }))
 
 vi.mock('./lib/github-access.js', () => ({

@@ -15,18 +15,19 @@ import {
 import { ClientTime } from '@/components/ui/client-time'
 import {
   AlertCircle,
-  BookOpen,
   Check,
   CheckCircle2,
   ClipboardCheck,
   Copy,
-  ExternalLink,
   Loader2,
+  LockKeyhole,
+  Play,
   Plus,
   RefreshCw,
   ShieldCheck,
+  Sparkles,
   Terminal,
-  Trash2,
+  X,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter } from 'next/navigation'
@@ -47,14 +48,22 @@ const MCP_SCOPES: Array<{ scope: McpScope; label: string }> = [
 const MCP_CLIENTS: Array<{ key: McpClientConfigKey; label: string }> = [
   { key: 'claudeDesktop', label: 'Claude Desktop' },
   { key: 'cursor', label: 'Cursor' },
-  { key: 'generic', label: 'JSON' },
+  { key: 'generic', label: 'Generic JSON' },
 ]
 
 function configToText(config: McpTokenConfig, activeClient: McpClientConfigKey) {
   return JSON.stringify(config.clientConfigs[activeClient].config, null, 2)
 }
 
-function CopyButton({ text }: { text: string }) {
+function CopyButton({
+  text,
+  label = 'Copy',
+  className = 'rounded p-1 text-muted-foreground hover:text-foreground transition-colors',
+}: {
+  text: string
+  label?: string
+  className?: string
+}) {
   const [copied, setCopied] = useState(false)
   async function copy() {
     await navigator.clipboard.writeText(text)
@@ -64,10 +73,12 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={copy}
-      className="rounded p-1 text-muted-foreground hover:text-foreground transition-colors"
-      title="Copy"
+      className={className}
+      title={label}
+      type="button"
     >
       {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      {label !== 'Copy' ? <span>{copied ? 'Copied' : label}</span> : null}
     </button>
   )
 }
@@ -83,18 +94,20 @@ function TokenHealthBadge({
   const passed = token.status === 'active' && result?.ok
   const used = !!token.lastUsedAt
   const className = passed
-    ? 'border-green-200 bg-green-50 text-green-700'
+    ? 'border-[var(--convergekit-align-ok-bd)] bg-[var(--convergekit-align-ok-bg)] text-[var(--convergekit-align-ok-fg)]'
     : token.status === 'revoked'
-      ? 'border-red-200 bg-red-50 text-red-700'
+      ? 'border-[var(--convergekit-align-conflict-bd)] bg-[var(--convergekit-align-conflict-bg)] text-[var(--convergekit-align-conflict-fg)]'
       : token.status === 'expired'
-        ? 'border-amber-200 bg-amber-50 text-amber-700'
-        : used
-          ? 'border-blue-200 bg-blue-50 text-blue-700'
-          : 'border-neutral-200 bg-neutral-50 text-neutral-600'
+        ? 'border-[var(--convergekit-align-stale-bd)] bg-[var(--convergekit-align-stale-bg)] text-[var(--convergekit-align-stale-fg)]'
+        : token.alertCount > 0
+          ? 'border-[var(--convergekit-align-conflict-bd)] bg-[var(--convergekit-align-conflict-bg)] text-[var(--convergekit-align-conflict-fg)]'
+          : used
+            ? 'border-[var(--convergekit-align-ok-bd)] bg-[var(--convergekit-align-ok-bg)] text-[var(--convergekit-align-ok-fg)]'
+            : 'border-[var(--convergekit-line)] bg-[var(--convergekit-bg-3)] text-[var(--convergekit-ink-3)]'
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${className}`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${className}`}
     >
       {passed ? <CheckCircle2 className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />}
       {passed
@@ -103,9 +116,11 @@ function TokenHealthBadge({
           ? 'Revoked'
           : token.status === 'expired'
             ? 'Expired'
-            : used
-              ? t('connected')
-              : t('notUsedYet')}
+            : token.alertCount > 0
+              ? 'Suspicious use'
+              : used
+                ? 'Healthy'
+                : t('notUsedYet')}
     </span>
   )
 }
@@ -263,44 +278,83 @@ function NewTokenBanner({
   onTest,
   onDismiss,
 }: NewTokenBannerProps) {
-  const t = useTranslations('repositoryDetail.settings')
   return (
-    <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-green-800">{t('tokenCreated')}</p>
-          <p className="mt-1 text-xs text-green-700">{t('tokenOnce')}</p>
+    <div className="rounded-[var(--convergekit-radius-lg)] border border-[#fde68a] bg-gradient-to-b from-[#fffbeb] to-white shadow-sm">
+      <div className="flex items-start gap-3.5 px-5 py-4">
+        <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-[#fef3c7] text-[#92400e]">
+          <LockKeyhole className="h-4 w-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-[var(--convergekit-ink)]">
+            Token created — copy it now
+          </p>
+          <p className="mt-0.5 text-[12.5px] text-[var(--convergekit-ink-3)]">
+            This token is shown <strong>once</strong>. We&apos;ve stored its fingerprint, not the
+            value.
+          </p>
+
+          <div className="mt-3 flex items-center gap-2.5 rounded-lg border border-[var(--convergekit-line)] bg-white px-3 py-2.5">
+            <code className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-[var(--convergekit-ink)]">
+              {setup.token}
+            </code>
+            <CopyButton
+              text={setup.token}
+              label="Copy token"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--convergekit-line)] bg-white px-2.5 text-xs font-medium text-[var(--convergekit-ink-2)] transition-colors hover:bg-[var(--convergekit-bg-3)]"
+            />
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-3.5">
+            <label className="text-xs text-[var(--convergekit-ink-3)]">Setup for</label>
+            <div className="inline-flex gap-0.5 rounded-lg bg-[var(--convergekit-bg-3)] p-0.5">
+              {MCP_CLIENTS.map((client) => (
+                <button
+                  key={client.key}
+                  type="button"
+                  onClick={() => onActiveClientChange(client.key)}
+                  className={`h-6 rounded-md border px-2.5 text-[11.5px] font-medium transition-colors ${
+                    activeClient === client.key
+                      ? 'border-[var(--convergekit-line)] bg-white text-[var(--convergekit-ink)]'
+                      : 'border-transparent bg-transparent text-[var(--convergekit-ink-3)] hover:text-[var(--convergekit-ink)]'
+                  }`}
+                >
+                  {client.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={onCopyConfig}
+              className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--convergekit-line)] bg-white px-2.5 text-xs font-medium text-[var(--convergekit-ink-2)] transition-colors hover:bg-[var(--convergekit-bg-3)]"
+            >
+              <Copy className="h-3 w-3" />
+              Copy config
+            </button>
+            <button
+              type="button"
+              onClick={onTest}
+              disabled={testing}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--convergekit-line)] bg-white px-2.5 text-xs font-medium text-[var(--convergekit-ink-2)] transition-colors hover:bg-[var(--convergekit-bg-3)] disabled:opacity-60"
+            >
+              {testing ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Play className="h-3 w-3" />
+              )}
+              {testing ? 'Testing...' : 'Test connection'}
+            </button>
+          </div>
         </div>
         <button
           type="button"
-          onClick={onTest}
-          disabled={testing}
-          className="inline-flex items-center gap-1.5 rounded-md border border-green-200 bg-white px-2.5 py-1.5 text-xs font-medium text-green-800 transition-colors hover:bg-green-100 disabled:opacity-60"
+          onClick={onDismiss}
+          className="grid h-[26px] w-[26px] flex-none place-items-center rounded-md text-[var(--convergekit-ink-4)] transition-colors hover:bg-[var(--convergekit-bg-3)] hover:text-[var(--convergekit-ink)]"
+          title="Dismiss"
         >
-          {testing ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Terminal className="h-3.5 w-3.5" />
-          )}
-          {testing ? t('testingConnection') : t('testConnection')}
+          <X className="h-3.5 w-3.5" />
         </button>
       </div>
-      <div className="mt-3">
-        <McpSetupPanel
-          config={setup}
-          activeClient={activeClient}
-          onActiveClientChange={onActiveClientChange}
-          onCopyConfig={onCopyConfig}
-          rawToken={setup.token}
-        />
-      </div>
-      {testResult && <ConnectionResultPanel result={testResult} />}
-      <button
-        onClick={onDismiss}
-        className="mt-2 text-xs text-green-700 underline underline-offset-2 hover:text-green-900"
-      >
-        {t('dismiss')}
-      </button>
+      {testResult && <div className="px-5 pb-4"><ConnectionResultPanel result={testResult} /></div>}
     </div>
   )
 }
@@ -320,6 +374,7 @@ export function SettingsTab({ repositoryId, repositoryName, isAdmin, currentUser
   const [tokens, setTokens] = useState<Token[]>([])
   const [ownerOptions, setOwnerOptions] = useState<McpTokenOwnerOption[]>([])
   const [ownerFilterUserId, setOwnerFilterUserId] = useState('all')
+  const [showCreateTokenForm, setShowCreateTokenForm] = useState(false)
   const [newLabel, setNewLabel] = useState('')
   const [expiresInDays, setExpiresInDays] = useState<7 | 30 | 90>(30)
   const [selectedScopes, setSelectedScopes] = useState<McpScope[]>(
@@ -397,6 +452,7 @@ export function SettingsTab({ repositoryId, repositoryName, isAdmin, currentUser
       setSetupByTokenId((prev) => ({ ...prev, [setup.tokenId]: setup }))
       setActiveClientFor(setup.tokenId, 'claudeDesktop')
       setNewLabel('')
+      setShowCreateTokenForm(false)
       await loadTokens()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to create token')
@@ -568,355 +624,442 @@ export function SettingsTab({ repositoryId, repositoryName, isAdmin, currentUser
   }
 
   return (
-    <div className="space-y-8 py-6">
+    <div className="settings-tab-shell flex w-full flex-col gap-3.5 pb-10 pt-5">
+      {newTokenSetup && (
+        <NewTokenBanner
+          setup={newTokenSetup}
+          activeClient={activeClientFor(newTokenSetup.tokenId)}
+          onActiveClientChange={(client) => setActiveClientFor(newTokenSetup.tokenId, client)}
+          onCopyConfig={() =>
+            void copySetupConfig(newTokenSetup, activeClientFor(newTokenSetup.tokenId))
+          }
+          testResult={testResults[newTokenSetup.tokenId] ?? null}
+          testing={testingId === newTokenSetup.tokenId}
+          onTest={() => void testConnection(newTokenSetup.tokenId)}
+          onDismiss={() => setNewTokenSetup(null)}
+        />
+      )}
+
       {/* MCP Tokens section */}
-      <section>
-        <h3 className="text-base font-semibold">{t('mcpTokens')}</h3>
-        <p className="mt-1 text-sm text-muted-foreground">{t('mcpTokensDescription')}</p>
-
-        {/* New token banner */}
-        {newTokenSetup && (
-          <div className="mt-4">
-            <NewTokenBanner
-              setup={newTokenSetup}
-              activeClient={activeClientFor(newTokenSetup.tokenId)}
-              onActiveClientChange={(client) => setActiveClientFor(newTokenSetup.tokenId, client)}
-              onCopyConfig={() =>
-                void copySetupConfig(newTokenSetup, activeClientFor(newTokenSetup.tokenId))
-              }
-              testResult={testResults[newTokenSetup.tokenId] ?? null}
-              testing={testingId === newTokenSetup.tokenId}
-              onTest={() => void testConnection(newTokenSetup.tokenId)}
-              onDismiss={() => setNewTokenSetup(null)}
-            />
+      <section className="settings-token-card overflow-hidden rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--convergekit-line-2)] px-5 py-4">
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--convergekit-ink)]">
+              {t('mcpTokens')}
+            </h3>
+            <p className="mt-0.5 text-[12.5px] text-[var(--convergekit-ink-3)]">
+              Issue scoped tokens for Claude Desktop, Cursor, or other MCP clients.
+            </p>
           </div>
-        )}
-
-        {/* Create token form */}
-        <form onSubmit={createToken} className="mt-4 space-y-3">
           <div className="flex flex-wrap gap-2">
-            <input
-              type="text"
-              placeholder={t('tokenLabelPlaceholder')}
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-              className="min-w-64 flex-1 rounded-md border border-border px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
-            />
-            <select
-              value={expiresInDays}
-              onChange={(e) => setExpiresInDays(Number(e.target.value) as 7 | 30 | 90)}
-              className="rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
-              aria-label="Token expiry"
-            >
-              <option value={7}>7 days</option>
-              <option value={30}>30 days</option>
-              <option value={90}>90 days</option>
-            </select>
+            {isAdmin && ownerOptions.length > 0 && (
+              <select
+                id="mcp-token-owner-filter"
+                value={ownerFilterUserId}
+                onChange={(e) => setOwnerFilterUserId(e.target.value)}
+                className="h-9 w-[180px] rounded-md border border-[var(--convergekit-line)] bg-white px-3 text-sm text-[var(--convergekit-ink-2)] outline-none transition-colors focus:border-[var(--convergekit-ink)]"
+              >
+                <option value="all">All token owners</option>
+                {ownerOptions.map((owner) => (
+                  <option key={owner.id} value={owner.id}>
+                    {owner.name} ({owner.email})
+                  </option>
+                ))}
+              </select>
+            )}
             <button
-              type="submit"
-              disabled={creating || !newLabel.trim() || selectedScopes.length === 0}
-              className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50 transition-opacity"
+              type="button"
+              onClick={() => setShowCreateTokenForm((current) => !current)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[var(--convergekit-ink)] px-3 text-sm font-medium text-white transition-opacity hover:opacity-90"
             >
-              <Plus className="h-4 w-4" />
-              {creating ? t('creating') : t('createToken')}
+              <Plus className="h-3.5 w-3.5" />
+              New token
             </button>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {MCP_SCOPES.map((entry) => (
-              <label
-                key={entry.scope}
-                className="inline-flex items-center gap-2 rounded-md border border-border bg-white px-2.5 py-1.5 text-xs text-neutral-700"
+        </div>
+
+        {showCreateTokenForm && (
+          <form
+            onSubmit={createToken}
+            className="border-b border-[var(--convergekit-line-2)] bg-[var(--convergekit-bg-2)] px-5 py-4"
+          >
+            <div className="flex flex-wrap gap-2">
+              <input
+                type="text"
+                placeholder={t('tokenLabelPlaceholder')}
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                className="min-w-64 flex-1 rounded-md border border-[var(--convergekit-line)] bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--convergekit-ink)]"
+              />
+              <select
+                value={expiresInDays}
+                onChange={(e) => setExpiresInDays(Number(e.target.value) as 7 | 30 | 90)}
+                className="rounded-md border border-[var(--convergekit-line)] bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--convergekit-ink)]"
+                aria-label="Token expiry"
               >
-                <input
-                  type="checkbox"
-                  checked={selectedScopes.includes(entry.scope)}
-                  onChange={() => toggleScope(entry.scope)}
-                />
-                <span>
-                  {entry.label} <code className="text-neutral-500">{entry.scope}</code>
-                </span>
-              </label>
-            ))}
-          </div>
-        </form>
-
-        {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
-
-        {isAdmin && ownerOptions.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <label
-              htmlFor="mcp-token-owner-filter"
-              className="text-xs font-medium text-muted-foreground"
-            >
-              Owner
-            </label>
-            <select
-              id="mcp-token-owner-filter"
-              value={ownerFilterUserId}
-              onChange={(e) => setOwnerFilterUserId(e.target.value)}
-              className="min-w-64 rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
-            >
-              <option value="all">All token owners</option>
-              {ownerOptions.map((owner) => (
-                <option key={owner.id} value={owner.id}>
-                  {owner.name} ({owner.email})
-                </option>
+                <option value={7}>7 days</option>
+                <option value={30}>30 days</option>
+                <option value={90}>90 days</option>
+              </select>
+              <button
+                type="submit"
+                disabled={creating || !newLabel.trim() || selectedScopes.length === 0}
+                className="inline-flex items-center gap-1.5 rounded-md bg-[var(--convergekit-ink)] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" />
+                {creating ? t('creating') : t('createToken')}
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {MCP_SCOPES.map((entry) => (
+                <label
+                  key={entry.scope}
+                  className="inline-flex items-center gap-2 rounded-md border border-[var(--convergekit-line)] bg-white px-2.5 py-1.5 text-xs text-[var(--convergekit-ink-2)]"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedScopes.includes(entry.scope)}
+                    onChange={() => toggleScope(entry.scope)}
+                  />
+                  <span>
+                    {entry.label} <code className="text-[var(--convergekit-ink-4)]">{entry.scope}</code>
+                  </span>
+                </label>
               ))}
-            </select>
-          </div>
+            </div>
+            {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+          </form>
         )}
 
-        {/* Token list */}
-        {tokens.length > 0 && (
-          <ul className="mt-4 divide-y divide-border rounded-lg border border-border bg-white">
-            {tokens.map((token) => {
-              const isOwnToken = token.owner.id === currentUserId
-              const ownerOnlyActionTitle = isOwnToken
-                ? undefined
-                : 'Only the token owner can use this action'
+        <div className="overflow-x-auto pb-1">
+          <table className="settings-token-table w-full min-w-[1040px] table-fixed border-separate border-spacing-0 text-left">
+            <colgroup>
+              <col className="w-[17%]" />
+              <col className="w-[10%]" />
+              <col className="w-[26%]" />
+              <col className="w-[9%]" />
+              <col className="w-[11%]" />
+              <col className="w-[10%]" />
+              <col className="w-[17%]" />
+            </colgroup>
+            <thead>
+              <tr className="border-b border-[var(--convergekit-line-2)] text-[11px] uppercase tracking-[0.06em] text-[var(--convergekit-ink-4)]">
+                <th>Label</th>
+                <th>Owner</th>
+                <th>Scopes</th>
+                <th>Last used</th>
+                <th>Health</th>
+                <th>Expires</th>
+                <th>
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {tokens.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-5 text-sm text-[var(--convergekit-ink-3)]">
+                    {t('noTokens')}
+                  </td>
+                </tr>
+              ) : (
+                tokens.map((token) => {
+                  const isOwnToken = token.owner.id === currentUserId
+                  const ownerOnlyActionTitle = isOwnToken
+                    ? undefined
+                    : 'Only the token owner can use this action'
 
-              return (
-                <li key={token.id} className="px-4 py-3">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-medium">{token.label}</p>
+                  return (
+                    <tr
+                      key={token.id}
+                      className="border-b border-[var(--convergekit-line-2)] last:border-b-0"
+                    >
+                      <td className="px-5 py-3 align-top">
+                        <div className="font-medium text-[var(--convergekit-ink)]">
+                          {token.label}
+                        </div>
+                        <div className="mt-1 font-mono text-[11px] text-[var(--convergekit-ink-4)]">
+                          fp:{token.fingerprint}
+                        </div>
+                      </td>
+                      <td className="min-w-0 px-5 py-3 align-top text-[12.5px] text-[var(--convergekit-ink-2)]">
+                        <span className="block truncate" title={token.owner.name}>
+                          {token.owner.id === currentUserId ? 'you' : token.owner.name}
+                        </span>
+                        {isAdmin && token.owner.id !== currentUserId && (
+                          <span className="mt-1 block text-[11px] text-[var(--convergekit-ink-4)]">
+                            Created by {token.owner.name}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3 align-top">
+                        <div className="flex flex-wrap gap-1">
+                          {token.scopes.map((scope) => (
+                            <span
+                              key={scope}
+                              className="rounded-full border border-[var(--convergekit-line)] bg-[var(--convergekit-bg-3)] px-2 py-0.5 font-mono text-[11px] text-[var(--convergekit-ink-2)]"
+                            >
+                              {scope}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 align-top text-[12.5px] whitespace-nowrap text-[var(--convergekit-ink-3)]">
+                        <ClientTime iso={token.lastUsedAt} style="relative" fallback={t('never')} />
+                      </td>
+                      <td className="settings-token-health-cell px-5 py-3 align-top">
                         <TokenHealthBadge token={token} result={testResults[token.id] ?? null} />
-                      </div>
-                      {isAdmin && (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Created by {token.owner.name}{' '}
-                          <span className="text-neutral-500">{token.owner.email}</span>
-                        </p>
-                      )}
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Fingerprint: <code>{token.fingerprint}</code> · Expires{' '}
-                        <ClientTime iso={token.expiresAt} style="dateTime" />
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        Scopes: {token.scopes.join(', ')}
-                      </p>
-                      {token.revokedReason && (
-                        <p className="mt-0.5 text-xs text-red-600">
-                          Revocation reason: {token.revokedReason}
-                        </p>
-                      )}
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {t('lastUsed')}:{' '}
-                        <ClientTime iso={token.lastUsedAt} style="dateTime" fallback={t('never')} />
-                      </p>
-                      {(token.lastUsedFrom.ip ||
-                        token.lastUsedFrom.clientName ||
-                        token.lastUsedFrom.toolName) && (
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          Last used from: {token.lastUsedFrom.clientName ?? 'unknown client'}
-                          {token.lastUsedFrom.toolName ? ` / ${token.lastUsedFrom.toolName}` : ''}
-                          {token.lastUsedFrom.ip ? ` / ${token.lastUsedFrom.ip}` : ''}
-                        </p>
-                      )}
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {t('created')} <ClientTime iso={token.createdAt} style="dateTime" />
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => void toggleSetup(token.id)}
-                        disabled={!isOwnToken}
-                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                        title={ownerOnlyActionTitle ?? t('clientSetup')}
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        {expandedSetupId === token.id ? t('hideSetup') : t('setup')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void renewToken(token.id)}
-                        disabled={creating || !isOwnToken}
-                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                        title={ownerOnlyActionTitle ?? 'Renew token'}
-                      >
-                        <RefreshCw className="h-3 w-3" />
-                        Renew
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void toggleAudit(token.id)}
-                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                      >
-                        Audit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void toggleAlerts(token.id)}
-                        className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors ${
-                          token.alertCount > 0
-                            ? 'border-amber-200 bg-amber-50 text-amber-800'
-                            : 'border-border text-muted-foreground hover:text-foreground'
+                      </td>
+                      <td
+                        className={`px-5 py-3 align-top text-[12.5px] whitespace-nowrap ${
+                          token.status === 'expired'
+                            ? 'text-[var(--convergekit-align-conflict-fg)]'
+                            : 'text-[var(--convergekit-ink-3)]'
                         }`}
                       >
-                        Alerts {token.alertCount > 0 ? `(${token.alertCount})` : ''}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void testConnection(token.id)}
-                        disabled={
-                          testingId === token.id || token.status !== 'active' || !isOwnToken
-                        }
-                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                        title={
-                          !isOwnToken
-                            ? ownerOnlyActionTitle
-                            : token.status === 'active'
-                              ? t('testConnection')
-                              : 'Renew this token before testing'
-                        }
-                      >
-                        {testingId === token.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Terminal className="h-3 w-3" />
-                        )}
-                        {testingId === token.id ? t('testingConnection') : t('testConnection')}
-                      </button>
-                      <button
-                        onClick={() => deleteToken(token.id)}
-                        disabled={deletingId === token.id || token.status === 'revoked'}
-                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
-                        title={t('revoke')}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                  {expandedSetupId === token.id && setupByTokenId[token.id] && (
-                    <div className="mt-3">
-                      <McpSetupPanel
-                        config={setupByTokenId[token.id]}
-                        activeClient={activeClientFor(token.id)}
-                        onActiveClientChange={(client) => setActiveClientFor(token.id, client)}
-                        onCopyConfig={() =>
-                          void copySetupConfig(setupByTokenId[token.id], activeClientFor(token.id))
-                        }
-                      />
-                    </div>
-                  )}
-                  {token.status === 'active' &&
-                    testResults[token.id] &&
-                    newTokenSetup?.tokenId !== token.id && (
-                      <ConnectionResultPanel result={testResults[token.id]} />
-                    )}
-                  {expandedAuditId === token.id && (
-                    <div className="mt-3 rounded-md border border-border bg-neutral-50 p-3">
-                      <p className="text-xs font-medium text-neutral-800">Audit trail</p>
-                      {(auditByTokenId[token.id] ?? []).length === 0 ? (
-                        <p className="mt-2 text-xs text-muted-foreground">No audit events yet.</p>
-                      ) : (
-                        <ul className="mt-2 space-y-2">
-                          {(auditByTokenId[token.id] ?? []).map((event) => (
-                            <li key={event.id} className="text-xs text-neutral-600">
-                              <span className="font-medium text-neutral-800">{event.status}</span> ·{' '}
-                              {event.method}
-                              {event.toolName ? ` / ${event.toolName}` : ''} · {event.latencyMs} ms
-                              · {event.ipAddress ?? 'unknown IP'} ·{' '}
-                              <ClientTime iso={event.createdAt} style="dateTime" />
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-                  {expandedAlertsId === token.id && (
-                    <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/60 p-3">
-                      <p className="text-xs font-medium text-amber-900">Suspicious-use alerts</p>
-                      {(alertsByTokenId[token.id] ?? []).length === 0 ? (
-                        <p className="mt-2 text-xs text-amber-800">No open alerts.</p>
-                      ) : (
-                        <ul className="mt-2 space-y-2">
-                          {(alertsByTokenId[token.id] ?? []).map((alert) => (
-                            <li
-                              key={alert.id}
-                              className="flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900"
+                        <ClientTime iso={token.expiresAt} style="relative" />
+                      </td>
+                      <td className="px-5 py-3 text-right align-top">
+                        <div className="settings-token-actions">
+                          {token.alertCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => void toggleAlerts(token.id)}
+                              className="rounded-md px-2 py-1 text-xs text-[var(--convergekit-align-stale-fg)] transition-colors hover:bg-[var(--convergekit-align-stale-bg)]"
                             >
-                              <span>
-                                <span className="font-medium">{alert.message}</span>
-                                {alert.details ? ` ${alert.details}` : ''}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => void acknowledgeAlert(token.id, alert.id)}
-                                className="rounded border border-amber-300 bg-white px-2 py-1 font-medium text-amber-900 hover:bg-amber-100"
-                              >
-                                Acknowledge
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        )}
+                              Alerts ({token.alertCount})
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => void toggleSetup(token.id)}
+                            disabled={!isOwnToken}
+                            className="rounded-md px-2 py-1 text-xs text-[var(--convergekit-ink-3)] transition-colors hover:bg-[var(--convergekit-bg-3)] hover:text-[var(--convergekit-ink)] disabled:opacity-40"
+                            title={ownerOnlyActionTitle ?? t('clientSetup')}
+                          >
+                            {expandedSetupId === token.id ? t('hideSetup') : t('setup')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void toggleAudit(token.id)}
+                            className="rounded-md px-2 py-1 text-xs text-[var(--convergekit-ink-3)] transition-colors hover:bg-[var(--convergekit-bg-3)] hover:text-[var(--convergekit-ink)]"
+                          >
+                            Audit
+                          </button>
+                          {token.status !== 'active' ? (
+                            <button
+                              type="button"
+                              onClick={() => void renewToken(token.id)}
+                              disabled={creating || !isOwnToken}
+                              className="rounded-md px-2 py-1 text-xs text-[var(--convergekit-ink-3)] transition-colors hover:bg-[var(--convergekit-bg-3)] hover:text-[var(--convergekit-ink)] disabled:opacity-40"
+                              title={ownerOnlyActionTitle ?? 'Renew token'}
+                            >
+                              Renew
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => deleteToken(token.id)}
+                              disabled={deletingId === token.id || !isOwnToken}
+                              className="rounded-md px-2 py-1 text-xs text-[var(--convergekit-ink-3)] transition-colors hover:bg-red-50 hover:text-destructive disabled:opacity-40"
+                              title={ownerOnlyActionTitle ?? t('revoke')}
+                            >
+                              Revoke
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
-        {tokens.length === 0 && !newTokenSetup && (
-          <p className="mt-4 text-sm text-muted-foreground">{t('noTokens')}</p>
-        )}
+        {tokens.map((token) => (
+          <div key={`${token.id}-expansions`} className="px-5">
+            {expandedSetupId === token.id && setupByTokenId[token.id] && (
+              <div className="border-t border-[var(--convergekit-line-2)] py-3">
+                <McpSetupPanel
+                  config={setupByTokenId[token.id]}
+                  activeClient={activeClientFor(token.id)}
+                  onActiveClientChange={(client) => setActiveClientFor(token.id, client)}
+                  onCopyConfig={() =>
+                    void copySetupConfig(setupByTokenId[token.id], activeClientFor(token.id))
+                  }
+                />
+                <div className="mt-3 flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void testConnection(token.id)}
+                    disabled={testingId === token.id || token.status !== 'active'}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--convergekit-line)] bg-white px-2.5 text-xs font-medium text-[var(--convergekit-ink-2)] transition-colors hover:bg-[var(--convergekit-bg-3)] disabled:opacity-50"
+                  >
+                    {testingId === token.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Play className="h-3 w-3" />
+                    )}
+                    {testingId === token.id ? t('testingConnection') : 'Test connection'}
+                  </button>
+                  {token.status !== 'active' && (
+                    <button
+                      type="button"
+                      onClick={() => void renewToken(token.id)}
+                      disabled={creating}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--convergekit-line)] bg-white px-2.5 text-xs font-medium text-[var(--convergekit-ink-2)] transition-colors hover:bg-[var(--convergekit-bg-3)] disabled:opacity-50"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${creating ? 'animate-spin' : ''}`} />
+                      Renew token
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            {token.status === 'active' &&
+              testResults[token.id] &&
+              newTokenSetup?.tokenId !== token.id && (
+                <div className="border-t border-[var(--convergekit-line-2)] py-3">
+                  <ConnectionResultPanel result={testResults[token.id]} />
+                </div>
+              )}
+            {expandedAuditId === token.id && (
+              <div className="border-t border-[var(--convergekit-line-2)] py-3">
+                <div className="rounded-md border border-[var(--convergekit-line)] bg-[var(--convergekit-bg-2)] p-3">
+                  <p className="text-xs font-medium text-[var(--convergekit-ink)]">Audit trail</p>
+                  {(auditByTokenId[token.id] ?? []).length === 0 ? (
+                    <p className="mt-2 text-xs text-[var(--convergekit-ink-3)]">
+                      No audit events yet.
+                    </p>
+                  ) : (
+                    <ul className="mt-2 space-y-2">
+                      {(auditByTokenId[token.id] ?? []).map((event) => (
+                        <li key={event.id} className="text-xs text-[var(--convergekit-ink-3)]">
+                          <span className="font-medium text-[var(--convergekit-ink)]">
+                            {event.status}
+                          </span>{' '}
+                          · {event.method}
+                          {event.toolName ? ` / ${event.toolName}` : ''} · {event.latencyMs} ms ·{' '}
+                          {event.ipAddress ?? 'unknown IP'} ·{' '}
+                          <ClientTime iso={event.createdAt} style="dateTime" />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+            {expandedAlertsId === token.id && (
+              <div className="border-t border-[var(--convergekit-line-2)] py-3">
+                <div className="rounded-md border border-amber-200 bg-amber-50/60 p-3">
+                  <p className="text-xs font-medium text-amber-900">Suspicious-use alerts</p>
+                  {(alertsByTokenId[token.id] ?? []).length === 0 ? (
+                    <p className="mt-2 text-xs text-amber-800">No open alerts.</p>
+                  ) : (
+                    <ul className="mt-2 space-y-2">
+                      {(alertsByTokenId[token.id] ?? []).map((alert) => (
+                        <li
+                          key={alert.id}
+                          className="flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900"
+                        >
+                          <span>
+                            <span className="font-medium">{alert.message}</span>
+                            {alert.details ? ` ${alert.details}` : ''}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => void acknowledgeAlert(token.id, alert.id)}
+                            className="rounded border border-amber-300 bg-white px-2 py-1 font-medium text-amber-900 hover:bg-amber-100"
+                          >
+                            Acknowledge
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
       </section>
 
       {isAdmin && (
         <>
-          {/* Re-index section */}
-          <section>
-            <h3 className="text-base font-semibold">{t('reindex')}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{t('reindexDescription')}</p>
-            {reindexError && <p className="mt-2 text-sm text-destructive">{reindexError}</p>}
-            <button
-              onClick={reindex}
-              disabled={reindexing}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 transition-colors"
-            >
-              <RefreshCw className={`h-4 w-4 ${reindexing ? 'animate-spin' : ''}`} />
-              {reindexing ? t('reindexing') : t('reindexButton')}
-            </button>
-          </section>
+          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+            {/* Re-index section */}
+            <section className="rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white shadow-sm">
+              <div className="border-b border-[var(--convergekit-line-2)] px-5 py-4">
+                <h3 className="text-sm font-semibold text-[var(--convergekit-ink)]">
+                  Re-index repository
+                </h3>
+                <p className="mt-0.5 text-[12.5px] text-[var(--convergekit-ink-3)]">
+                  Re-clone, parse, and embed everything from scratch.
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-4 px-5 py-4">
+                <p className="text-xs text-[var(--convergekit-ink-4)]">
+                  Last full index: use repository status above
+                </p>
+                {reindexError && <p className="text-xs text-destructive">{reindexError}</p>}
+                <button
+                  type="button"
+                  onClick={reindex}
+                  disabled={reindexing}
+                  className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-[var(--convergekit-line)] bg-white px-3 text-sm font-medium text-[var(--convergekit-ink-2)] transition-colors hover:bg-[var(--convergekit-bg-3)] disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${reindexing ? 'animate-spin' : ''}`} />
+                  {reindexing ? t('reindexing') : 'Re-index'}
+                </button>
+              </div>
+            </section>
 
-          {/* Regenerate Wiki section */}
-          <section>
-            <h3 className="text-base font-semibold">{t('regenerateWiki')}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{t('regenerateWikiDescription')}</p>
-            {regenerateWikiError && (
-              <p className="mt-2 text-sm text-destructive">{regenerateWikiError}</p>
-            )}
-            <button
-              onClick={regenerateWiki}
-              disabled={regeneratingWiki}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 transition-colors"
-            >
-              <BookOpen className={`h-4 w-4 ${regeneratingWiki ? 'animate-pulse' : ''}`} />
-              {regeneratingWiki ? t('regeneratingWiki') : t('regenerateWikiButton')}
-            </button>
-          </section>
+            {/* Regenerate Wiki section */}
+            <section className="rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white shadow-sm">
+              <div className="border-b border-[var(--convergekit-line-2)] px-5 py-4">
+                <h3 className="text-sm font-semibold text-[var(--convergekit-ink)]">
+                  Regenerate Wiki
+                </h3>
+                <p className="mt-0.5 text-[12.5px] text-[var(--convergekit-ink-3)]">
+                  Skip indexing; rebuild pages from current chunks.
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-4 px-5 py-4">
+                <p className="text-xs text-[var(--convergekit-ink-4)]">
+                  Rebuilds wiki pages from current evidence
+                </p>
+                {regenerateWikiError && (
+                  <p className="text-xs text-destructive">{regenerateWikiError}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={regenerateWiki}
+                  disabled={regeneratingWiki}
+                  className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-[var(--convergekit-line)] bg-white px-3 text-sm font-medium text-[var(--convergekit-ink-2)] transition-colors hover:bg-[var(--convergekit-bg-3)] disabled:opacity-50"
+                >
+                  <Sparkles className={`h-3.5 w-3.5 ${regeneratingWiki ? 'animate-pulse' : ''}`} />
+                  {regeneratingWiki ? t('regeneratingWiki') : 'Regenerate'}
+                </button>
+              </div>
+            </section>
+          </div>
 
           {/* Danger Zone section */}
-          <section className="rounded-lg border border-red-200 bg-red-50/40">
-            <div className="border-b border-red-200 px-4 py-3">
-              <h3 className="text-sm font-semibold text-red-700">{t('dangerZone')}</h3>
-            </div>
-            <div className="flex items-center justify-between px-4 py-4">
+          <section className="rounded-[var(--convergekit-radius-lg)] border border-[#fecaca] bg-white shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
               <div>
-                <p className="text-sm font-medium text-neutral-800">{t('deleteRepository')}</p>
-                <p className="mt-0.5 text-xs text-neutral-500">
-                  {t('deleteRepositoryDescription')}
+                <h3 className="text-sm font-semibold text-[#b91c1c]">Danger zone</h3>
+                <p className="mt-0.5 text-[12.5px] text-[var(--convergekit-ink-3)]">
+                  Deleting a repository removes all indexed data, wiki pages, chats, and tokens.
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => setShowDeleteDialog(true)}
-                className="ml-6 shrink-0 rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-600 hover:text-white hover:border-red-600"
+                className="inline-flex h-9 items-center rounded-md bg-[#dc2626] px-3 text-sm font-medium text-white transition-colors hover:bg-[#b91c1c]"
               >
-                {t('deleteRepository')}
+                Delete repository
               </button>
             </div>
           </section>

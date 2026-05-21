@@ -10,6 +10,22 @@ const TIER_LABELS = {
   C: 'Docs',
   D: 'Design/History',
 } as const
+const EVIDENCE_LABEL_TIERS = {
+  Code: 'A',
+  Tests: 'B',
+  Docs: 'C',
+  'Design/History': 'D',
+} as const satisfies Record<
+  RepositoryGuideSummary['evidenceTotals'][number]['label'],
+  (typeof TIERS)[number]
+>
+const CONFIDENCE_SCORES = {
+  'Very strong': 5,
+  Strong: 4,
+  'Mixed with docs': 3,
+  'Gated history': 2,
+  Limited: 1,
+} as const satisfies Record<RepositoryGuideSummary['areas'][number]['confidenceLabel'], number>
 
 export type GuideAreaFile = {
   path: string
@@ -198,6 +214,24 @@ function evidenceShare(
   }))
 }
 
+export function getAreaPathHint(area: GuideAreaInput): string | null {
+  if (area.files.length === 0) return null
+
+  const directories = area.files.map((file) => {
+    const segments = file.path.split('/').filter(Boolean)
+    return segments.length > 1 ? segments.slice(0, -1) : ['root']
+  })
+  const common = [...(directories[0] ?? [])]
+
+  for (const directory of directories.slice(1)) {
+    while (common.length > 0 && common.some((segment, index) => directory[index] !== segment)) {
+      common.pop()
+    }
+  }
+
+  return common.length > 0 ? common.join('/') : 'mixed paths'
+}
+
 const tierSets = {
   current_code: ['A', 'B'],
   api_schema: ['A', 'B'],
@@ -278,6 +312,71 @@ export function buildQuestionStarters(
   })
 }
 
+function basename(path: string) {
+  return path.split('/').filter(Boolean).at(-1) ?? path
+}
+
+function evidenceSourcesForCard(
+  area: GuideAreaInput,
+  tiers: readonly GuideAreaFile['evidenceTier'][],
+): RepositoryGuideSummary['questionCards'][number]['sources'] {
+  const allowedTiers = new Set(tiers)
+  const sourceMap = new Map<
+    string,
+    RepositoryGuideSummary['questionCards'][number]['sources'][number]
+  >()
+
+  for (const file of area.files) {
+    if (!allowedTiers.has(file.evidenceTier)) continue
+    const label = basename(file.path)
+    const key = `${file.evidenceTier}:${label}`
+    const existing = sourceMap.get(key)
+    sourceMap.set(key, {
+      tier: file.evidenceTier,
+      label,
+      count: (existing?.count ?? 0) + 1,
+    })
+  }
+
+  return [...sourceMap.values()]
+    .sort((a, b) => TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier) || a.label.localeCompare(b.label))
+    .slice(0, 4)
+}
+
+export function buildQuestionCards(areas: GuideAreaInput[]): RepositoryGuideSummary['questionCards'] {
+  const starters = buildQuestionStarters(areas)
+
+  return starters.flatMap((starter) => {
+    const area = pickStrongestArea(areas, starter.intent)
+    if (!area) return []
+
+    const routeTiers = starter.evidenceLabels.map((label) => EVIDENCE_LABEL_TIERS[label])
+    const confidenceLabel = getAreaConfidenceLabel(area)
+    const confidence = CONFIDENCE_SCORES[confidenceLabel]
+    const primaryTier = routeTiers[0]
+    const secondaryTier = routeTiers[1] ?? null
+    const sources = evidenceSourcesForCard(area, routeTiers)
+    const route = starter.evidenceLabels.join(' + ')
+    const alignment =
+      confidence <= 1 ? 'conflict' : primaryTier === 'D' || confidence <= 2 ? 'stale' : 'ok'
+
+    return [
+      {
+        intent: starter.intent,
+        question: starter.examplePrompt,
+        confidence,
+        route,
+        primaryTier,
+        secondaryTier,
+        rationale: `${area.name} is supported by ${route.toLowerCase()} evidence across ${area.files.length} indexed files. Use this route for ${starter.title.toLowerCase()} questions.`,
+        alignment,
+        generatedFromArea: area.name,
+        sources,
+      },
+    ]
+  })
+}
+
 export function resolveGuideFiles(rows: GuideDocumentRow[]): {
   files: GuideAreaFile[]
   metadataStatus: RepositoryGuideSummary['metadataStatus']
@@ -309,6 +408,7 @@ function toGuideArea(area: GuideAreaInput): RepositoryGuideSummary['areas'][numb
   return {
     name: area.name,
     confidenceLabel: getAreaConfidenceLabel(area),
+    pathHint: getAreaPathHint(area),
     evidenceShare: evidenceShare(area.files),
     primaryQuestionIntents: computeAreaIntents(area),
   }
@@ -408,6 +508,7 @@ export async function getRepositoryGuideSummary(
       evidenceTotals: [],
       areas: [],
       questionStarters: [],
+      questionCards: [],
       skippedSummary: [],
     }
   }
@@ -450,6 +551,7 @@ export async function getRepositoryGuideSummary(
     })),
     areas: sourceAreas.map(toGuideArea),
     questionStarters: buildQuestionStarters(sourceAreas),
+    questionCards: buildQuestionCards(sourceAreas),
     skippedSummary: [],
   }
 }

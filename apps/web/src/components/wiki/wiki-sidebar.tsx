@@ -1,16 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { WikiSection } from '@/lib/api-client'
 import { ClientTime } from '@/components/ui/client-time'
-import {
-  buildInitialOpenSections,
-  syncOpenSections,
-  toggleOpenSection,
-} from '@/components/wiki/wiki-sidebar-state'
 
 interface Props {
   repoName: string
@@ -25,52 +19,42 @@ function SectionItem({
   repositoryId,
   activeSlug,
   locale,
-  open,
-  onToggle,
 }: {
   section: WikiSection
   repositoryId: string
   activeSlug: string
   locale: string
-  open: boolean
-  onToggle: () => void
 }) {
   return (
-    <div>
-      <button
-        onClick={onToggle}
-        className="flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-neutral-900 hover:bg-neutral-100 transition-colors"
-      >
-        {open
-          ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-neutral-400" />
-          : <ChevronRight className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-neutral-400" />}
-        <span className="min-w-0 whitespace-normal leading-5">{section.title}</span>
-      </button>
+    <div className="mb-3.5">
+      <div className="label-eyebrow mb-1.5 px-2 text-[10.5px]">{section.title}</div>
+      <div className="flex flex-col gap-px">
+        {section.pages.map((page) => {
+          const isGenerating = page.status === 'pending' || page.status === 'generating'
 
-      {open && (
-        <div className="mt-1 space-y-1 pl-3">
-          {section.pages.map((page) => (
+          return (
             <a
               key={page.slug}
               href={`/${locale}/repositories/${repositoryId}/wiki/${page.slug}`}
               className={cn(
-                'flex items-start gap-2 rounded-lg px-3 py-2 text-sm leading-5 transition-colors',
+                'flex min-w-0 items-center gap-1.5 rounded-[5px] px-2 py-[5px] text-[13px] leading-5 transition-colors',
                 activeSlug === page.slug
-                  ? 'border-l-2 border-neutral-900 bg-neutral-100 pl-2.5 font-medium text-neutral-900'
-                  : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900',
-                page.status === 'pending' || page.status === 'generating'
-                  ? 'opacity-50'
-                  : '',
+                  ? 'bg-[var(--convergekit-bg-3)] font-semibold text-[var(--convergekit-ink)]'
+                  : isGenerating
+                    ? 'text-[var(--convergekit-ink-4)]'
+                    : 'text-[var(--convergekit-ink-2)] hover:bg-[var(--convergekit-bg-3)] hover:text-[var(--convergekit-ink)]',
               )}
             >
-              <span className="min-w-0 whitespace-normal">{page.title}</span>
-              {(page.status === 'pending' || page.status === 'generating') && (
-                <span className="ml-auto h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-400 animate-pulse" />
+              <span className="min-w-0 flex-1 truncate">{page.title}</span>
+              {isGenerating && (
+                <span className="ml-auto rounded-full bg-[var(--convergekit-bg-3)] px-1.5 py-px text-[10px] font-normal text-[var(--convergekit-ink-4)]">
+                  generating
+                </span>
               )}
             </a>
-          ))}
-        </div>
-      )}
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -80,35 +64,28 @@ export function WikiSidebar({ repoName, repositoryId, sections, lastGeneratedAt,
   // Extract locale and slug from path: /en/repositories/:id/wiki/:slug
   const locale = pathname.split('/')[1] ?? 'en'
   const activeSlug = pathname.split('/wiki/')[1] ?? ''
-  const initialOpenSections = useMemo(() => buildInitialOpenSections(sections), [sections])
-  const [openSections, setOpenSections] = useState(initialOpenSections)
-
-  useEffect(() => {
-    setOpenSections((current) => syncOpenSections(current, sections))
-  }, [sections])
 
   return (
-    <aside className="flex flex-col gap-4 rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white px-3 py-4">
-      {/* Repo + metadata */}
-      <div className="border-b border-[var(--convergekit-line-2)] px-1 pb-4">
+    <nav className="flex flex-col">
+      <div className="mb-3.5 border-b border-[var(--convergekit-line-2)] pb-3">
         <a
           href={`/${locale}/repositories/${repositoryId}`}
-          className="block text-sm font-semibold text-neutral-900 hover:underline truncate"
+          className="jw-back mb-3 flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium text-[var(--convergekit-ink-2)] hover:text-[var(--convergekit-ink)]"
         >
-          {repoName}
+          <ChevronLeft className="h-3 w-3 flex-shrink-0" />
+          <span className="truncate">{repoName}</span>
         </a>
         {lastGeneratedAt && (
-          <p className="mt-1 text-xs text-neutral-400">
-            Last indexed: <ClientTime iso={lastGeneratedAt} />
+          <p className="text-[11px] text-[var(--convergekit-ink-4)]">
+            Indexed <ClientTime iso={lastGeneratedAt} />
             {commitSha && (
-              <span className="ml-1 font-mono">({commitSha.slice(0, 7)})</span>
+              <span className="ml-1 font-mono">· {commitSha.slice(0, 7)}</span>
             )}
           </p>
         )}
       </div>
 
-      {/* Navigation */}
-      <nav className="space-y-1">
+      <div>
         {sections.map((section) => (
           <SectionItem
             key={section.slug}
@@ -116,11 +93,9 @@ export function WikiSidebar({ repoName, repositoryId, sections, lastGeneratedAt,
             repositoryId={repositoryId}
             activeSlug={activeSlug}
             locale={locale}
-            open={openSections[section.slug] ?? true}
-            onToggle={() => setOpenSections((current) => toggleOpenSection(current, section.slug))}
           />
         ))}
-      </nav>
-    </aside>
+      </div>
+    </nav>
   )
 }

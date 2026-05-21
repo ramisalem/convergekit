@@ -2,11 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
-import { CheckCircle, ChevronRight, FileText, Search } from 'lucide-react'
+import { CheckCircle, FileText, Search } from 'lucide-react'
+import { CodeBlock } from '@/components/ai-elements/code-block'
 import { cn } from '@/lib/utils'
 import { useJobProgress } from '@/lib/use-job-progress'
 import { documentsApi, wikiApi } from '@/lib/api-client'
 import type { DocumentPath, DocumentContent, WikiSection } from '@/lib/api-client'
+import { DocumentFileTree } from './document-file-tree'
+import { getDocumentCodeLanguage } from './document-code-language'
 import { getDocsTabPhase, shouldPollWikiPages, type DocsPhase } from './docs-tab-state'
 
 interface Props {
@@ -245,116 +248,102 @@ export function DocsTab({ repositoryId, status: initialStatus, jobId, queue = 'r
               : t('wikiRegenerationProgress', { progress }),
           }
     : null
-  const filteredDocs = docs.filter((doc) =>
-    doc.path.toLowerCase().includes(docQuery.trim().toLowerCase()),
-  )
+  const selectedDocLanguage = selectedDoc
+    ? getDocumentCodeLanguage({
+        path: selectedDoc.path,
+        programmingLanguage: selectedDoc.programmingLanguage,
+      })
+    : null
 
   // status === 'done' — doc browser
   return (
-    <div className="space-y-4 py-6">
-      {wikiBanner && (
-        <div className={cn('rounded-[var(--convergekit-radius-lg)] border px-4 py-3', wikiBanner.tone)}>
-          <p className="text-sm font-semibold">{wikiBanner.title}</p>
-          <p className="mt-1 text-sm opacity-90">{wikiBanner.description}</p>
-        </div>
-      )}
+    <div
+      className="file-structure-pane-grid grid h-[calc(100vh_-_16rem)] min-h-[640px] w-full min-w-0 overflow-hidden border-b border-[var(--convergekit-line)] bg-[var(--convergekit-bg)]"
+      style={{ gridTemplateColumns: '320px minmax(0,1fr)' }}
+    >
+      <aside className="file-structure-rail flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r border-[var(--convergekit-line)] bg-white px-[14px] py-4">
+        <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--convergekit-ink-4)]">
+          {t('documents')}
+        </p>
+        <label className="relative mb-2 block">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--convergekit-ink-4)]" />
+          <input
+            value={docQuery}
+            onChange={(event) => setDocQuery(event.target.value)}
+            placeholder="Search files"
+            className="h-8 w-full rounded-md border border-[var(--convergekit-line)] bg-white pl-8 pr-2 text-xs text-[var(--convergekit-ink)] outline-none focus:border-[var(--convergekit-focus)]"
+          />
+        </label>
+        {docsError ? (
+          <p className="px-2 text-xs text-red-500">{docsError}</p>
+        ) : docs.length === 0 ? (
+          <p className="px-2 text-xs text-[var(--convergekit-ink-4)]">{t('noDocuments')}</p>
+        ) : (
+          <DocumentFileTree
+            documents={docs}
+            query={docQuery}
+            selectedPath={selectedPath}
+            onSelect={setSelectedPath}
+          />
+        )}
+      </aside>
 
-      <div className="grid gap-4 rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white p-3 lg:grid-cols-[260px_minmax(0,1fr)]">
-        {/* Sidebar */}
-        <aside className="min-w-0 border-b border-[var(--convergekit-line-2)] pb-3 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-3">
-          <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--convergekit-ink-4)]">
-            {t('documents')}
-          </p>
-          <label className="relative mb-2 block">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--convergekit-ink-4)]" />
-            <input
-              value={docQuery}
-              onChange={(event) => setDocQuery(event.target.value)}
-              placeholder="Search files"
-              className="h-8 w-full rounded-md border border-[var(--convergekit-line)] bg-white pl-8 pr-2 text-xs text-[var(--convergekit-ink)] outline-none focus:border-[var(--convergekit-focus)]"
-            />
-          </label>
-          {docsError ? (
-            <p className="px-2 text-xs text-red-500">{docsError}</p>
-          ) : docs.length === 0 ? (
-            <p className="px-2 text-xs text-[var(--convergekit-ink-4)]">{t('noDocuments')}</p>
-          ) : (
-            <div className="space-y-0.5">
-              {filteredDocs.map((doc) => {
-                const fileName = doc.path.split('/').pop() ?? doc.path
-                const dir = doc.path.includes('/') ? doc.path.split('/').slice(0, -1).join('/') : null
-                return (
-                  <button
-                    key={doc.path}
-                    onClick={() => setSelectedPath(doc.path)}
-                    title={doc.path}
-                    className={cn(
-                      'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors',
-                      selectedPath === doc.path
-                        ? 'bg-[var(--convergekit-bg-3)] font-medium text-[var(--convergekit-ink)]'
-                        : 'text-[var(--convergekit-ink-3)] hover:bg-[var(--convergekit-bg-2)] hover:text-[var(--convergekit-ink)]',
-                    )}
-                  >
-                    <FileText className="h-3.5 w-3.5 flex-shrink-0 text-[var(--convergekit-ink-4)]" />
-                    <span className="min-w-0">
-                      <span className="block truncate">{fileName}</span>
-                      {dir && (
-                        <span className="block truncate text-xs text-[var(--convergekit-ink-4)]">{dir}</span>
-                      )}
+      <div className="file-structure-center-column flex h-full min-h-0 min-w-0 justify-center overflow-hidden px-5 py-4">
+        <div className="flex h-full min-h-0 w-full max-w-[64rem] flex-col gap-3 overflow-hidden">
+          {wikiBanner && (
+            <div className={cn('shrink-0 rounded-[var(--convergekit-radius-lg)] border px-4 py-3', wikiBanner.tone)}>
+              <p className="text-sm font-semibold">{wikiBanner.title}</p>
+              <p className="mt-1 text-sm opacity-90">{wikiBanner.description}</p>
+            </div>
+          )}
+
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[var(--convergekit-radius-md)] border border-[var(--convergekit-line)] bg-white">
+            {!selectedPath && (
+              <div className="flex items-center gap-2 border-b border-[var(--convergekit-line-2)] bg-green-50 px-4 py-2.5 text-sm text-green-700">
+                <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                {t('indexingComplete')}
+              </div>
+            )}
+
+            {!selectedPath ? (
+              <div className="flex flex-1 flex-col items-center justify-center px-6 py-20 text-center">
+                <FileText className="mb-3 h-8 w-8 text-[var(--convergekit-line-strong)]" />
+                <p className="text-sm text-[var(--convergekit-ink-3)]">{t('selectDocument')}</p>
+              </div>
+            ) : loadingDoc ? (
+              <div className="flex flex-1 items-center justify-center py-20">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-600" />
+              </div>
+            ) : selectedDoc ? (
+              <div className="flex h-full min-h-0 flex-col">
+                <div className="flex items-center gap-2 border-b border-[var(--convergekit-line-2)] px-4 py-2.5">
+                  <FileText className="h-4 w-4 flex-shrink-0 text-[var(--convergekit-ink-4)]" />
+                  <span className="truncate text-sm font-medium text-[var(--convergekit-ink-2)]">{selectedDoc.path}</span>
+                  {selectedDoc.programmingLanguage && (
+                    <span className="ml-auto flex-shrink-0 rounded border border-[var(--convergekit-line)] bg-[var(--convergekit-bg-3)] px-2 py-0.5 text-xs text-[var(--convergekit-ink-4)]">
+                      {selectedDoc.programmingLanguage}
                     </span>
-                    {selectedPath === doc.path && (
-                      <ChevronRight className="ml-auto h-3 w-3 flex-shrink-0" />
-                    )}
-                  </button>
-                )
-              })}
-              {filteredDocs.length === 0 && (
-                <p className="px-2 py-2 text-xs text-[var(--convergekit-ink-4)]">
-                  No files match your search.
-                </p>
-              )}
-            </div>
-          )}
-        </aside>
-
-        {/* Document content */}
-        <div className="min-w-0 overflow-hidden rounded-[var(--convergekit-radius-md)] border border-[var(--convergekit-line)] bg-white">
-          {!selectedPath && (
-            <div className="flex items-center gap-2 border-b border-[var(--convergekit-line-2)] bg-green-50 px-4 py-2.5 text-sm text-green-700">
-              <CheckCircle className="h-4 w-4 flex-shrink-0" />
-              {t('indexingComplete')}
-            </div>
-          )}
-
-          {!selectedPath ? (
-            <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
-              <FileText className="mb-3 h-8 w-8 text-[var(--convergekit-line-strong)]" />
-              <p className="text-sm text-[var(--convergekit-ink-3)]">{t('selectDocument')}</p>
-            </div>
-          ) : loadingDoc ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-600" />
-            </div>
-          ) : selectedDoc ? (
-            <div className="flex h-full flex-col">
-              <div className="flex items-center gap-2 border-b border-[var(--convergekit-line-2)] px-4 py-2.5">
-                <FileText className="h-4 w-4 flex-shrink-0 text-[var(--convergekit-ink-4)]" />
-                <span className="truncate text-sm font-medium text-[var(--convergekit-ink-2)]">{selectedDoc.path}</span>
-                {selectedDoc.programmingLanguage && (
-                  <span className="ml-auto flex-shrink-0 rounded border border-[var(--convergekit-line)] bg-[var(--convergekit-bg-3)] px-2 py-0.5 text-xs text-[var(--convergekit-ink-4)]">
-                    {selectedDoc.programmingLanguage}
-                  </span>
+                  )}
+                </div>
+                {selectedDocLanguage ? (
+                  <CodeBlock
+                    className="document-code-viewer flex-1 rounded-none border-0 bg-[var(--convergekit-bg)]"
+                    code={selectedDoc.content}
+                    language={selectedDocLanguage}
+                    showLineNumbers
+                  />
+                ) : (
+                  <pre className="document-raw-viewer flex-1 overflow-auto whitespace-pre-wrap break-all p-4 font-mono text-xs leading-relaxed text-[var(--convergekit-ink-2)]">
+                    {selectedDoc.content}
+                  </pre>
                 )}
               </div>
-              <pre className="flex-1 overflow-auto whitespace-pre-wrap break-all p-4 font-mono text-xs leading-relaxed text-[var(--convergekit-ink-2)]">
-                {selectedDoc.content}
-              </pre>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center py-20">
-              <p className="text-sm text-[var(--convergekit-ink-3)]">Failed to load document</p>
-            </div>
-          )}
+            ) : (
+              <div className="flex flex-1 items-center justify-center py-20">
+                <p className="text-sm text-[var(--convergekit-ink-3)]">Failed to load document</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -99,7 +99,7 @@
   "repositoryDetail": {
     "backToRepositories": "Repositories",
     "tabs": {
-      "docs": "Documentation",
+      "docs": "File Structure",
       "guide": "Repo Guide",
       "structure": "Repo Guide",
       "chat": "Chat",
@@ -112,10 +112,10 @@
       "indexingStalled": "Taking longer than expected — the worker may be busy or restarting. This page will update automatically.",
       "indexingFailed": "Indexing failed",
       "indexingFailedDescription": "An error occurred during indexing. Please try again from Settings.",
-      "documents": "Documents",
-      "noDocuments": "No documents indexed yet.",
-      "selectDocument": "Select a document from the sidebar to view its content.",
-      "indexingComplete": "Repository indexed successfully. Documents are ready.",
+      "documents": "Files",
+      "noDocuments": "No files indexed yet.",
+      "selectDocument": "Select a file from the tree to view its content.",
+      "indexingComplete": "Repository indexed successfully. Files are ready.",
       "wikiRegenerationInProgress": "Wiki regeneration is running in the background.",
       "wikiRegenerationProgress": "Progress: {progress}%. Your indexed documents remain available while the wiki updates.",
       "wikiRegenerationStalled": "Wiki regeneration is taking longer than expected.",

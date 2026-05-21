@@ -331,6 +331,85 @@
     font-weight: inherit;
   }
 
+  .document-code-viewer {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .document-code-viewer > .relative {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: auto;
+  }
+
+  .document-code-viewer pre {
+    min-width: 100%;
+    margin: 0;
+    background: transparent;
+    white-space: pre;
+  }
+
+  .document-code-viewer code {
+    font-family: var(--convergekit-font-mono);
+    font-size: 0.78rem;
+    line-height: 1.65;
+    white-space: pre;
+  }
+
+  .document-code-viewer span {
+    white-space: pre;
+  }
+
+  .settings-token-table th,
+  .settings-token-table td {
+    border-bottom: 1px solid var(--convergekit-line-2);
+    padding: 12px 20px;
+    vertical-align: top;
+  }
+
+  .settings-token-table th {
+    background: var(--convergekit-bg-2);
+    border-bottom: 1px solid var(--convergekit-line);
+    color: var(--convergekit-ink-3);
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    padding: 9px 20px;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .settings-token-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .settings-token-table tbody tr:hover td {
+    background: var(--convergekit-bg-2);
+  }
+
+  .settings-token-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    justify-content: flex-end;
+    white-space: nowrap;
+  }
+
+  .settings-token-actions button {
+    white-space: nowrap;
+  }
+
+  .settings-token-health-cell {
+    white-space: nowrap;
+  }
+
+  .repository-detail-header-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .wiki-left-rail,
   .wiki-page-toc-rail {
     display: none;
@@ -342,9 +421,105 @@
     letter-spacing: 0;
   }
 
+  .wiki-reader-article > * {
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 720px;
+    text-align: left;
+  }
+
+  .mermaid-diagram-frame svg {
+    height: auto;
+    max-width: 100%;
+  }
+
+  .mermaid-diagram-expanded svg {
+    height: auto;
+    max-width: none;
+  }
+
+  .label-eyebrow {
+    color: var(--convergekit-ink-4);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .jw-chip {
+    align-items: center;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    display: inline-flex;
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    padding: 1px 6px;
+    white-space: nowrap;
+  }
+
+  .jw-chip.auth-A {
+    background: var(--convergekit-auth-a-bg);
+    border-color: color-mix(in oklab, var(--convergekit-auth-a-bd) 24%, white);
+    color: var(--convergekit-auth-a-fg);
+  }
+
+  .jw-chip.auth-B {
+    background: var(--convergekit-auth-b-bg);
+    border-color: color-mix(in oklab, var(--convergekit-auth-b-bd) 24%, white);
+    color: var(--convergekit-auth-b-fg);
+  }
+
+  .jw-chip.auth-C {
+    background: var(--convergekit-auth-c-bg);
+    border-color: color-mix(in oklab, var(--convergekit-auth-c-bd) 24%, white);
+    color: var(--convergekit-auth-c-fg);
+  }
+
+  .jw-chip.auth-D {
+    background: var(--convergekit-auth-d-bg);
+    border-color: color-mix(in oklab, var(--convergekit-auth-d-bd) 24%, white);
+    color: var(--convergekit-auth-d-fg);
+  }
+
+  .jw-bar {
+    align-items: center;
+    border-left: 3px solid transparent;
+    color: var(--convergekit-ink-2);
+    display: inline-flex;
+    gap: 6px;
+    line-height: 1.3;
+    min-width: 0;
+    padding-left: 8px;
+  }
+
+  .jw-bar.auth-A {
+    border-color: var(--convergekit-auth-a-bd);
+  }
+
+  .jw-bar.auth-B {
+    border-color: var(--convergekit-auth-b-bd);
+  }
+
+  .jw-bar.auth-C {
+    border-color: var(--convergekit-auth-c-bd);
+  }
+
+  .jw-bar.auth-D {
+    border-color: var(--convergekit-auth-d-bd);
+  }
+
+  .jw-bar.auth-source {
+    border-color: var(--convergekit-line-strong);
+  }
+
   @media (width >= 48rem) {
     .wiki-left-rail {
       display: block;
+    }
+
+    .repository-detail-header-grid {
+      grid-template-columns: minmax(0, 1fr) auto;
     }
   }
 

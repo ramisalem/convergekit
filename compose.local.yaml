@@ -1,3 +1,7 @@
+x-convergekit-node-dns: &convergekit-node-dns
+  - ${CONVERGEKIT_DNS_PRIMARY:-1.1.1.1}
+  - ${CONVERGEKIT_DNS_SECONDARY:-8.8.8.8}
+
 services:
   reverse-proxy:
     image: caddy:2.8-alpine
@@ -33,6 +37,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    dns: *convergekit-node-dns
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,8 +56,8 @@ services:
       WEB_APP_URL: https://convergekit-dev.local
       ALLOWED_ORIGINS: https://convergekit-dev.local
       INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@example.com}
-      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
-      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-convergekit-local-github-client-id}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-convergekit-local-github-client-secret}
       WORKFORCE_SSO_ENABLED: ${WORKFORCE_SSO_ENABLED:-false}
       WORKFORCE_SSO_PROVIDER_LABEL: ${WORKFORCE_SSO_PROVIDER_LABEL:-Workforce SSO}
       WORKFORCE_SAML_IDP_SSO_URL: ${WORKFORCE_SAML_IDP_SSO_URL:-}
@@ -75,6 +80,7 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+    dns: *convergekit-node-dns
     depends_on:
       api:
         condition: service_started
@@ -91,6 +97,7 @@ services:
     build:
       context: .
       dockerfile: apps/worker/Dockerfile
+    dns: *convergekit-node-dns
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,6 +109,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-convergekit}:${POSTGRES_PASSWORD:-convergekit_secret}@postgres:5432/${POSTGRES_DB:-convergekit}
       REDIS_URL: redis://redis:6379
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change-me-to-a-random-32-char-string}
       WORKSPACE_DIR: /workspace
       MAX_INDEX_FILE_BYTES: ${MAX_INDEX_FILE_BYTES:-524288}
       INDEX_CHUNK_BATCH_SIZE: ${INDEX_CHUNK_BATCH_SIZE:-64}

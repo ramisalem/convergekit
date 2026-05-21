@@ -19,6 +19,7 @@ import {
   getEmbeddingOptionsFromModelOptions,
   getModelOptionsForRepo,
 } from '../lib/ai.js'
+import { linkRelatedPages, type RelatedPageLink } from '../lib/wiki-related-pages.js'
 import { sanitizeGeneratedWikiContent } from '../lib/wiki-markdown.js'
 import { logger } from '../logger.js'
 
@@ -131,6 +132,7 @@ async function generatePageContent(
   repositoryId: string,
   page: { title: string; summary: string },
   mindmapContext: string,
+  relatedPageTitles: string[],
   modelOptions?: ModelOptions,
 ): Promise<{ content: string; sourceFiles: string[] }> {
   const embeddingOptions = getEmbeddingOptionsFromModelOptions(modelOptions)
@@ -159,7 +161,7 @@ Formatting rules:
 - Return raw markdown only. Never wrap the entire page in \`\`\` or \`\`\`markdown fences.
 - Do NOT invent API shapes or behavior not evidenced in the context
 - Length: 800–1500 words of prose (excluding code blocks and diagrams)
-- End with a ## Related Pages section listing 2–4 related page titles as plain text`
+- End with a ## Related Pages section listing 2–4 titles copied exactly from the available wiki page titles`
 
   const prompt = `Write the wiki page titled "${page.title}".
 
@@ -167,7 +169,10 @@ Context from the codebase:
 ${contextBlock || '(No indexed chunks found — use the mind map context below)'}
 
 Relevant context from the repository mind map:
-${mindmapContext}`
+${mindmapContext}
+
+Available wiki page titles:
+${relatedPageTitles.filter((title) => title !== page.title).map((title) => `- ${title}`).join('\n')}`
 
   const { text, reasoningText } = await generateText({
     model: getModel('mindmap', modelOptions),
@@ -178,28 +183,6 @@ ${mindmapContext}`
   })
 
   return { content: text || reasoningText || '', sourceFiles }
-}
-
-/**
- * Post-process the "## Related Pages" section to convert plain-text titles
- * into markdown links using the known title→slug map from the TOC.
- */
-function linkRelatedPages(content: string, titleToSlug: Map<string, string>): string {
-  const relatedIdx = content.lastIndexOf('## Related Pages')
-  if (relatedIdx === -1) return content
-
-  const before = content.slice(0, relatedIdx)
-  let after = content.slice(relatedIdx)
-
-  // Replace each known title with a markdown link (longest titles first to avoid partial matches)
-  const sortedTitles = [...titleToSlug.keys()].sort((a, b) => b.length - a.length)
-  for (const title of sortedTitles) {
-    const slug = titleToSlug.get(title)!
-    // Only replace if not already a link
-    after = after.replaceAll(title, `[${title}](${slug})`)
-  }
-
-  return before + after
 }
 
 // ─── Main job processor ───────────────────────────────────────────────────────
@@ -271,14 +254,15 @@ async function processWikiGeneration(job: Job<WikiGenerationJobData>): Promise<v
   const insertedPages = await upsertWikiPages(pagesToInsert)
   logger.info({ repositoryId, total: insertedPages.length }, 'Wiki pages upserted as pending')
 
-  // Build title→slug map for linking Related Pages section
-  const titleToSlug = new Map<string, string>()
-  for (const section of toc.sections) {
-    titleToSlug.set(section.title, section.slug)
-    for (const page of section.pages) {
-      titleToSlug.set(page.title, page.slug)
-    }
-  }
+  // Related links should only target generated child pages. Section headers are
+  // navigation placeholders, so linking to them produces non-readable pages.
+  const childRelatedPages = toc.sections.flatMap((section) =>
+    section.pages.map((page) => ({ title: page.title, slug: page.slug })),
+  )
+  const relatedPages: RelatedPageLink[] = toc.sections.flatMap((section) => [
+    ...(section.pages[0] ? [{ title: section.title, slug: section.pages[0].slug }] : []),
+    ...section.pages.map((page) => ({ title: page.title, slug: page.slug })),
+  ])
 
   await job.updateProgress(25)
 
@@ -296,10 +280,11 @@ async function processWikiGeneration(job: Job<WikiGenerationJobData>): Promise<v
         repositoryId,
         { title: page.title, summary: page.summary ?? page.title },
         mindmapDoc.content,
+        childRelatedPages.map((relatedPage) => relatedPage.title),
         modelOptions,
       )
       const sanitizedContent = sanitizeGeneratedWikiContent(rawContent)
-      const content = linkRelatedPages(sanitizedContent, titleToSlug)
+      const content = linkRelatedPages(sanitizedContent, relatedPages)
       if (!content.startsWith('<details>')) {
         logger.warn({ repositoryId, slug: page.slug }, 'Generated wiki page is missing the leading source files block')
       }

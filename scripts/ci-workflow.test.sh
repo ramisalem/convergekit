@@ -30,6 +30,12 @@ assert_file_contains 'bash scripts/opensource-sanitization.test.sh' \
   'workflow runs the public identity guard'
 assert_file_contains 'bash scripts/package-scope.test.sh' \
   'workflow runs the package scope guard'
+assert_file_contains 'bash scripts/local-env-parity.test.sh' \
+  'workflow runs local environment parity checks'
+assert_file_contains 'bash scripts/dev-sh-compose-wrapper.test.sh' \
+  'workflow runs the compose-first dev.sh contract'
+assert_file_contains 'bash scripts/local-compose-config.test.sh' \
+  'workflow validates Compose config files'
 assert_file_contains 'run: pnpm turbo test' \
   'workflow runs the workspace test suite'
 assert_file_contains 'run: pnpm turbo typecheck' \

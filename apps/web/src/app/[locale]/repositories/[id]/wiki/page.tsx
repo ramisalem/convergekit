@@ -1,11 +1,11 @@
-import { getWebBaseUrl } from '@/lib/runtime-urls'
+import { getApiBaseUrl } from '@/lib/runtime-urls'
 import { BookOpen } from 'lucide-react'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
-const WEB_URL = getWebBaseUrl()
+const API_URL = getApiBaseUrl()
 
 interface Props {
   params: Promise<{ id: string; locale: string }>
@@ -16,7 +16,7 @@ async function fetchWikiPages(repositoryId: string, locale: string) {
   const cookieHeader = cookieStore.toString()
   let res: Response
   try {
-    res = await fetch(`${WEB_URL}/api/wiki/${repositoryId}/pages`, {
+    res = await fetch(`${API_URL}/api/wiki/${repositoryId}/pages`, {
       headers: { cookie: cookieHeader },
       cache: 'no-store',
     })

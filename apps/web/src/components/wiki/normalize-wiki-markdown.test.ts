@@ -44,4 +44,67 @@ describe('normalizeWikiMarkdown', () => {
       '```',
     ].join('\n'))
   })
+
+  it('links plain related page titles when the reader knows their slugs', () => {
+    const input = [
+      '# Architecture',
+      '',
+      '## Related Pages',
+      '- Indexing Pipeline',
+      '- Wiki Generation',
+      '- Overview',
+    ].join('\n')
+
+    expect(
+      normalizeWikiMarkdown(input, [
+        { title: 'Indexing Pipeline', slug: 'indexing-pipeline' },
+        { title: 'Wiki Generation', slug: 'wiki-generation' },
+      ]),
+    ).toBe([
+      '# Architecture',
+      '',
+      '## Related Pages',
+      '- [Indexing Pipeline](indexing-pipeline)',
+      '- [Wiki Generation](wiki-generation)',
+      '- Overview',
+    ].join('\n'))
+  })
+
+  it('does not create nested links in the related pages section', () => {
+    const input = [
+      '## Related Pages',
+      '- [Indexing Pipeline](indexing-pipeline)',
+      '- [Wiki Generation]()',
+    ].join('\n')
+
+    expect(
+      normalizeWikiMarkdown(input, [
+        { title: 'Indexing Pipeline', slug: 'indexing-pipeline' },
+        { title: 'Wiki Generation', slug: 'wiki-generation' },
+      ]),
+    ).toBe([
+      '## Related Pages',
+      '- [Indexing Pipeline](indexing-pipeline)',
+      '- [Wiki Generation](wiki-generation)',
+    ].join('\n'))
+  })
+
+  it('can repair older related sections that used a section title alias', () => {
+    const input = [
+      '## Related Pages',
+      '- Authentication and User Management',
+      '- Story Generation System',
+    ].join('\n')
+
+    expect(
+      normalizeWikiMarkdown(input, [
+        { title: 'Authentication and User Management', slug: 'authentication-components' },
+        { title: 'Generate Story Function', slug: 'generate-story-function' },
+      ]),
+    ).toBe([
+      '## Related Pages',
+      '- [Authentication and User Management](authentication-components)',
+      '- [Story Generation System](generate-story-function)',
+    ].join('\n'))
+  })
 })

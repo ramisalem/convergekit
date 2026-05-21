@@ -1,3 +1,5 @@
+import { linkRelatedPagesInMarkdown, type RelatedPageLink } from './related-pages'
+
 const WHOLE_DOCUMENT_FENCE_RE = /^\s*```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/
 const EXISTING_LINK_RE = /\[[^\]]+\]\([^)]*\)/g
 const FENCED_BLOCK_RE = /```[\s\S]*?```/g
@@ -66,7 +68,10 @@ function repairMermaidBlocks(content: string): string {
   }).trimStart()
 }
 
-export function normalizeWikiMarkdown(content: string): string {
+export function normalizeWikiMarkdown(
+  content: string,
+  relatedPages: RelatedPageLink[] = [],
+): string {
   const links: string[] = []
   const fencedBlocks: string[] = []
   const inlineCode: string[] = []
@@ -83,6 +88,7 @@ export function normalizeWikiMarkdown(content: string): string {
   normalized = restoreSegments(normalized, 'WIKI_INLINE', inlineCode)
   normalized = restoreSegments(normalized, 'WIKI_FENCE', fencedBlocks)
   normalized = restoreSegments(normalized, 'WIKI_LINK', links)
+  normalized = linkRelatedPagesInMarkdown(normalized, relatedPages)
 
   return normalized
 }

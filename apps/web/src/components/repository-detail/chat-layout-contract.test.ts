@@ -1,40 +1,59 @@
 import { code as streamdownCode } from '@streamdown/code'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const chatTabSource = readFileSync(new URL('./chat-tab.tsx', import.meta.url), 'utf8')
-const chatSessionListSource = readFileSync(
-  new URL('./chat-session-list.tsx', import.meta.url),
-  'utf8',
-)
-const chatSessionViewSource = readFileSync(
-  new URL('./chat-session-view.tsx', import.meta.url),
-  'utf8',
-)
-const chatMessagePartsSource = readFileSync(
-  new URL('./chat-message-parts.tsx', import.meta.url),
-  'utf8',
-)
-const repositoryDetailPageSource = readFileSync(
+function readSource(url: URL) {
+  return existsSync(url) ? readFileSync(url, 'utf8') : ''
+}
+
+const chatTabSource = readSource(new URL('./chat-tab.tsx', import.meta.url))
+const chatSessionListSource = readSource(new URL('./chat-session-list.tsx', import.meta.url))
+const chatSessionViewSource = readSource(new URL('./chat-session-view.tsx', import.meta.url))
+const chatMessagePartsSource = readSource(new URL('./chat-message-parts.tsx', import.meta.url))
+const chatActivityRailSource = readSource(new URL('./chat-activity-rail.tsx', import.meta.url))
+const repositoryDetailPageSource = readSource(
   new URL('../../app/[locale]/repositories/[id]/page.tsx', import.meta.url),
-  'utf8',
 )
-const toolSource = readFileSync(new URL('../ai-elements/tool.tsx', import.meta.url), 'utf8')
-const globalsCssSource = readFileSync(new URL('../../app/globals.css', import.meta.url), 'utf8')
+const toolSource = readSource(new URL('../ai-elements/tool.tsx', import.meta.url))
+const globalsCssSource = readSource(new URL('../../app/globals.css', import.meta.url))
 
 describe('chat layout contract', () => {
-  it('keeps the desktop source rail stable and the streaming composer explicit', () => {
-    expect(chatTabSource).toContain('overflow-hidden')
-    expect(chatTabSource).toContain('lg:grid-cols-[260px_minmax(0,1fr)_320px]')
-    expect(chatTabSource).toContain('min-w-0 overflow-hidden')
-    expect(chatTabSource).toContain('No sources yet')
-    expect(chatSessionListSource).toContain('shrink-0')
-    expect(chatSessionListSource).toContain('md:w-72')
+  it('matches the mockup three-column chat shell with a persistent activity rail', () => {
+    expect(chatTabSource).toContain('chat-pane-grid')
+    expect(chatTabSource).toContain("gridTemplateColumns: '260px minmax(0,1fr) 260px'")
+    expect(chatTabSource).not.toContain("gridTemplateColumns: '260px minmax(0,1fr) 320px'")
+    expect(chatTabSource).toContain('h-[calc(100vh_-_16rem)]')
+    expect(chatTabSource).toContain('min-h-[640px]')
+    expect(chatTabSource).toContain('w-full')
+    expect(chatTabSource).toContain('chat-center-column')
+    expect(chatTabSource).toContain('flex h-full min-h-0 w-full overflow-hidden')
+    expect(chatTabSource).not.toContain('max-w-[48rem]')
+    expect(chatTabSource).not.toContain('max-w-[88rem]')
+    expect(chatTabSource).not.toContain('mx-auto grid h-[640px]')
+    expect(chatTabSource).not.toContain('gap-3.5')
+    expect(chatTabSource).toContain('justify-center overflow-hidden px-5')
+    expect(chatTabSource).toContain('<ChatActivityRail snapshot={activitySnapshot} />')
+    expect(chatTabSource).not.toContain('No sources yet')
+    expect(chatTabSource).not.toContain('2xl:flex')
+    expect(chatSessionListSource).toContain('h-full min-h-0 min-w-0')
+    expect(chatSessionListSource).toContain('chat-session-rail')
+    expect(chatSessionListSource).toContain('Sessions')
+    expect(chatSessionListSource).toContain('border-l-2')
+    expect(chatSessionListSource).toContain('border-b border-[var(--convergekit-line-2)]')
+    expect(chatSessionListSource).not.toContain('md:w-72')
+    expect(chatSessionListSource).toContain('overflow-y-auto')
+    expect(chatSessionListSource).not.toContain('overflow-x-auto')
     expect(chatSessionViewSource).toContain('min-w-0')
     expect(chatSessionViewSource).toContain('overflow-hidden')
-    expect(chatSessionViewSource).toContain('<Conversation className="min-h-0 flex-1">')
+    expect(chatSessionViewSource).toContain(
+      '<Conversation className="min-h-0 min-w-0 flex-1">',
+    )
     expect(chatSessionViewSource).toContain('aria-busy')
     expect(chatSessionViewSource).toContain('cursor-not-allowed')
+    expect(chatActivityRailSource).toContain('Search agent activity')
+    expect(chatActivityRailSource).toContain('chat-activity-rail')
+    expect(chatActivityRailSource).toContain('buildChatActivityRailItems')
+    expect(chatActivityRailSource).toContain('toolCount')
   })
 
   it('wraps long chat content inside the transcript pane', () => {
@@ -44,31 +63,65 @@ describe('chat layout contract', () => {
 
   it('lets the chat workspace grow with wider and taller browser windows', () => {
     expect(repositoryDetailPageSource).toContain(
-      "effectiveActiveTab === 'chat' ? 'max-w-[88rem]' : 'max-w-[72rem]'",
+      'repository-detail-workspace-frame mx-auto w-full max-w-[1500px] px-5 py-8',
     )
-    expect(chatTabSource).toContain("height: 'calc(100vh - 230px)'")
+    expect(repositoryDetailPageSource).toContain('repository-detail-chrome')
+    expect(repositoryDetailPageSource).toContain('repository-detail-tab-frame')
+    expect(repositoryDetailPageSource).not.toContain('max-w-none px-0 pb-0')
+    expect(repositoryDetailPageSource).not.toContain('repository-detail-rail-chrome')
+    expect(repositoryDetailPageSource).not.toContain('isWorkspaceCanvasTab')
+    expect(repositoryDetailPageSource).not.toContain('isPinnedSideRailTab')
+    expect(chatTabSource).toContain('h-[calc(100vh_-_16rem)]')
+    expect(chatTabSource).not.toContain('grid h-[640px]')
+    expect(chatTabSource).not.toContain('max-h-[calc(100vh_-_230px)]')
+    expect(chatTabSource).toContain('min-h-[640px]')
     expect(chatTabSource).not.toContain("maxHeight: '780px'")
-    expect(chatSessionViewSource).toContain('max-w-[min(100%,60rem)]')
+    expect(chatSessionViewSource).toContain('max-w-[78%]')
+  })
+
+  it('keeps the repository header title anchored to the left of the detail canvas', () => {
+    expect(repositoryDetailPageSource).toContain('repository-detail-header-grid')
+    expect(repositoryDetailPageSource).toContain(
+      'repository-detail-header-grid mt-4 grid w-full items-start gap-4 text-left',
+    )
+    expect(repositoryDetailPageSource).not.toContain(
+      'repository-detail-header-grid mt-4 grid w-full grid-cols-1',
+    )
+    expect(repositoryDetailPageSource).toContain('justify-self-start')
+    expect(repositoryDetailPageSource).toContain('md:justify-self-end')
+    expect(repositoryDetailPageSource).not.toContain('md:grid-cols-[minmax(0,1fr)_auto]')
+    expect(globalsCssSource).toContain('.repository-detail-header-grid')
+    expect(globalsCssSource).toContain('grid-template-columns: minmax(0, 1fr) auto')
+  })
+
+  it('makes the wiki action prominent inside pinned-rail repository chrome', () => {
+    expect(repositoryDetailPageSource).toContain('repository-detail-view-wiki')
+    expect(repositoryDetailPageSource).toContain(
+      'bg-[var(--convergekit-ink)] px-4 text-sm font-semibold text-white',
+    )
+    expect(repositoryDetailPageSource).not.toContain(
+      'border border-[var(--convergekit-line)] bg-white px-3 text-sm font-medium text-[var(--convergekit-ink-2)]',
+    )
   })
 
   it('places the empty chat prompt near the composer', () => {
     expect(chatSessionViewSource).toContain('chat-empty-state')
     expect(chatSessionViewSource).toContain('justify-end')
+    expect(chatSessionViewSource).toContain('pb-6')
     expect(chatSessionViewSource).not.toContain('items-center justify-center text-center')
   })
 
-  it('renders reasoning and tool calls as a prompt-kit style activity timeline', () => {
-    expect(chatSessionViewSource).toContain('ChatActivity')
+  it('moves reasoning and tool calls into the right activity rail', () => {
+    expect(chatSessionViewSource).toContain('onActivitySnapshotChange')
+    expect(chatSessionViewSource).toContain('activitySnapshot')
+    expect(chatSessionViewSource).toContain('getActivityParts(latestAssistantMessage)')
+    expect(chatSessionViewSource).not.toContain('<ChatActivity')
     expect(chatSessionViewSource).not.toContain('<ChatReasoning')
     expect(chatSessionViewSource).not.toContain('<ChatTools')
-    expect(chatMessagePartsSource).toContain('ChainOfThought')
-    expect(chatMessagePartsSource).toContain('ChainOfThoughtStep')
-    expect(chatMessagePartsSource).toContain('Search Agent Activity')
-    expect(chatMessagePartsSource).toContain('ActivityStepList')
-    expect(chatMessagePartsSource).toContain('ActivityStepItem')
-    expect(chatMessagePartsSource).toContain('aria-label={`Step ${stepNumber}`}')
-    expect(chatMessagePartsSource).toContain('ToolInput')
-    expect(chatMessagePartsSource).toContain('ToolOutput')
+    expect(chatActivityRailSource).toContain('buildChatActivityRailItems')
+    expect(chatActivityRailSource).toContain('Sparkles')
+    expect(chatActivityRailSource).toContain('FileCode2')
+    expect(chatActivityRailSource).toContain('tools')
   })
 
   it('uses prompt-kit status labels for core tool states', () => {
@@ -81,8 +134,10 @@ describe('chat layout contract', () => {
   it('gives user and assistant turns visible boundaries', () => {
     expect(chatSessionViewSource).toContain('ConvergeKit')
     expect(chatSessionViewSource).toContain('You')
-    expect(chatSessionViewSource).toContain('border-[var(--convergekit-line)] bg-white')
+    expect(chatSessionViewSource).toContain('rounded-[14px_14px_4px_14px]')
     expect(chatSessionViewSource).toContain('bg-[var(--convergekit-ink)] text-white')
+    expect(chatSessionViewSource).toContain('ConvergeKit ·')
+    expect(chatSessionViewSource).toContain('bg-gradient-to-br')
   })
 
   it('surfaces interrupted streams inside the assistant turn', () => {
@@ -93,7 +148,7 @@ describe('chat layout contract', () => {
   it('styles code reference anchors as compact pills', () => {
     expect(chatSessionViewSource).toContain('linkCodeReferences(content)')
     expect(chatSessionViewSource).toContain('extractCodeReferences(content)')
-    expect(chatSessionViewSource).toContain('Sources:')
+    expect(chatSessionViewSource).toContain('Sources ·')
     expect(chatSessionViewSource).toContain('chat-response')
     expect(chatSessionViewSource).toContain('chat-source-pill')
     expect(globalsCssSource).toContain(".chat-response a[href^='#code-reference-']")

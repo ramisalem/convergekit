@@ -17,26 +17,31 @@ import { chatApi, type ChatMessage } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
-import { FileCode2 } from 'lucide-react'
+import { FileCode2, Send } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  EMPTY_CHAT_ACTIVITY_SNAPSHOT,
+  type ChatActivitySnapshot,
+} from './chat-activity-rail'
 import { extractCodeReferences, linkCodeReferences } from './chat-code-references'
+import type { CodeReference } from './chat-code-references'
 import { mergeChatActivityParts, toInitialChatMessages } from './chat-history-state'
 import { getActivityParts, getMessageContent } from './chat-message-activity'
-import { ChatActivity } from './chat-message-parts'
 
 type Props = {
   repositoryId: string
   activeSessionId: string | null
   initialMessages: ChatMessage[]
+  onActivitySnapshotChange: (snapshot: ChatActivitySnapshot) => void
   onSessionCreated: (repositoryId: string, sessionId: string) => void
   onSessionUpdated: (repositoryId: string) => void
 }
 
 const assistantMessageClassName =
-  'min-w-0 max-w-full w-full rounded-lg border border-[var(--convergekit-line)] bg-white px-4 py-4 shadow-sm [overflow-wrap:anywhere]'
+  'min-w-0 max-w-full w-full bg-transparent px-0 py-0 text-[13.5px] leading-[1.55] text-[var(--convergekit-ink)] [overflow-wrap:anywhere]'
 const userMessageClassName =
-  'max-w-full rounded-lg border border-[var(--convergekit-ink)] bg-[var(--convergekit-ink)] text-white px-4 py-3 shadow-sm'
+  'max-w-[78%] rounded-[14px_14px_4px_14px] border border-[var(--convergekit-ink)] bg-[var(--convergekit-ink)] text-white px-[14px] py-2.5 text-[13.5px] leading-[1.5] shadow-sm'
 const assistantResponseClassName = [
   'chat-response max-w-full break-words [overflow-wrap:anywhere]',
   '[&_pre]:overflow-x-auto',
@@ -59,10 +64,54 @@ function hasAssistantActivity(messages: ReturnType<typeof toInitialChatMessages>
   )
 }
 
+function getActivitySnapshotSignature(snapshot: ChatActivitySnapshot) {
+  const activitySignature = snapshot.activityParts
+    .map((part) =>
+      part.type === 'tool'
+        ? `${part.id}:${part.tool.toolName}:${part.tool.state}`
+        : `${part.id}:${part.text}`,
+    )
+    .join('|')
+  const sourceSignature = snapshot.sources.map((source) => source.reference).join('|')
+
+  return `${snapshot.isStreaming}:${snapshot.toolCount}:${activitySignature}:${sourceSignature}`
+}
+
+function AssistantSources({ sources }: { sources: CodeReference[] }) {
+  if (sources.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-[var(--convergekit-line)] bg-[var(--convergekit-bg-2)] px-3 py-2.5">
+      <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--convergekit-ink-3)]">
+        Sources · {sources.length}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {sources.map((source) => (
+          <a
+            key={source.reference}
+            className="chat-source-pill"
+            href={source.href}
+            title={source.reference}
+          >
+            <FileCode2 className="h-3 w-3 shrink-0" />
+            <span className="max-w-56 truncate">{source.path}</span>
+            {source.lineRange ? (
+              <span className="chat-source-line-range">{source.lineRange}</span>
+            ) : null}
+          </a>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function ChatSessionView({
   repositoryId,
   activeSessionId,
   initialMessages,
+  onActivitySnapshotChange,
   onSessionCreated,
   onSessionUpdated,
 }: Props) {
@@ -98,6 +147,37 @@ export function ChatSessionView({
   const isGenerating = status === 'submitted' || status === 'streaming'
   const isBusy = submitting || isGenerating
   const examples = [t('example1'), t('example2'), t('example3')]
+  const latestAssistantMessage = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index]
+
+      if (message?.role === 'assistant') {
+        return message
+      }
+    }
+
+    return null
+  }, [messages])
+  const activitySnapshot = useMemo((): ChatActivitySnapshot => {
+    if (!latestAssistantMessage) {
+      return EMPTY_CHAT_ACTIVITY_SNAPSHOT
+    }
+
+    const content = getMessageContent(latestAssistantMessage)
+    const activityParts = getActivityParts(latestAssistantMessage)
+
+    return {
+      activityParts: getActivityParts(latestAssistantMessage),
+      isStreaming: isGenerating,
+      sources: extractCodeReferences(content),
+      toolCount: activityParts.filter((part) => part.type === 'tool').length,
+    }
+  }, [isGenerating, latestAssistantMessage])
+  const activitySnapshotSignature = useMemo(
+    () => getActivitySnapshotSignature(activitySnapshot),
+    [activitySnapshot],
+  )
+  const publishedActivitySnapshotSignature = useRef('')
 
   useEffect(() => {
     const mergedMessages = mergeChatActivityParts(messages, activitySourceMessages.current)
@@ -112,6 +192,15 @@ export function ChatSessionView({
       activitySourceMessages.current = messages
     }
   }, [messages, setMessages])
+
+  useEffect(() => {
+    if (activitySnapshotSignature === publishedActivitySnapshotSignature.current) {
+      return
+    }
+
+    publishedActivitySnapshotSignature.current = activitySnapshotSignature
+    onActivitySnapshotChange(activitySnapshot)
+  }, [activitySnapshot, activitySnapshotSignature, onActivitySnapshotChange])
 
   useEffect(() => {
     if (initialMessagesFingerprint === lastAppliedFingerprint.current) {
@@ -182,20 +271,20 @@ export function ChatSessionView({
   return (
     <section
       aria-busy={isBusy}
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white"
+      className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white shadow-sm"
     >
-      <Conversation className="min-h-0 flex-1">
+      <Conversation className="min-h-0 min-w-0 flex-1">
         <ConversationContent
           className={
-            messages.length === 0 ? 'h-full gap-4 px-5 py-5' : 'min-h-full gap-4 px-5 py-5'
+            messages.length === 0 ? 'h-full gap-4 px-6 py-5' : 'min-h-full gap-[18px] px-6 pb-3 pt-5'
           }
         >
           {messages.length === 0 ? (
-            <div className="chat-empty-state mx-auto flex h-full w-full max-w-2xl flex-col items-center justify-end pb-8 text-center">
+            <div className="chat-empty-state mx-auto flex h-full w-full max-w-2xl flex-col items-center justify-end pb-6 text-center">
               <p className="text-sm font-semibold">{t('title')}</p>
               <p className="mt-1 max-w-md text-sm text-muted-foreground">{t('description')}</p>
-              <div className="mt-5 w-full max-w-2xl overflow-hidden">
-                <Suggestions className="justify-center">
+              <div className="mt-5 w-full max-w-2xl overflow-visible px-4">
+                <Suggestions className="w-full flex-wrap justify-center">
                   {examples.map((example) => (
                     <Suggestion
                       key={example}
@@ -210,8 +299,6 @@ export function ChatSessionView({
             messages.map((message, index) => {
               const content = getMessageContent(message)
               const isAssistant = message.role === 'assistant'
-              const isStreamingMessage =
-                isAssistant && status === 'streaming' && index === messages.length - 1
               const isInterruptedAssistantMessage =
                 isAssistant && Boolean(error) && status === 'error' && index === messages.length - 1
               const linkedContent = isAssistant ? linkCodeReferences(content) : content
@@ -221,7 +308,7 @@ export function ChatSessionView({
                 <Message
                   key={message.id}
                   from={message.role}
-                  className={isAssistant ? 'max-w-[min(100%,60rem)]' : 'max-w-[min(82%,36rem)]'}
+                  className={isAssistant ? 'max-w-full' : 'max-w-[78%]'}
                 >
                   <div
                     className={
@@ -232,40 +319,20 @@ export function ChatSessionView({
                   >
                     {isAssistant ? (
                       <>
-                        <span className="grid h-5 w-5 place-items-center rounded bg-[var(--convergekit-ink)] text-[9px] font-bold text-white">
+                        <span className="grid h-[22px] w-[22px] place-items-center rounded-md bg-gradient-to-br from-[#1d4ed8] to-[#6d28d9] text-[11px] font-bold text-white">
                           CK
                         </span>
-                        <span>ConvergeKit</span>
+                        <span>ConvergeKit · Claude Sonnet 4.5</span>
                       </>
                     ) : (
                       'You'
                     )}
                   </div>
-                  {sources.length > 0 ? (
-                    <div className="flex flex-wrap items-center gap-1.5 px-1 text-xs">
-                      <span className="mr-0.5 font-medium text-muted-foreground">Sources:</span>
-                      {sources.map((source) => (
-                        <a
-                          key={source.reference}
-                          className="chat-source-pill"
-                          href={source.href}
-                          title={source.reference}
-                        >
-                          <FileCode2 className="h-3 w-3 shrink-0" />
-                          <span className="max-w-64 truncate">{source.path}</span>
-                          {source.lineRange ? (
-                            <span className="chat-source-line-range">{source.lineRange}</span>
-                          ) : null}
-                        </a>
-                      ))}
-                    </div>
-                  ) : null}
                   <MessageContent
                     className={isAssistant ? assistantMessageClassName : userMessageClassName}
                   >
                     {isAssistant ? (
                       <>
-                        <ChatActivity isStreaming={isStreamingMessage} message={message} />
                         {content ? (
                           <MessageResponse className={assistantResponseClassName}>
                             {linkedContent}
@@ -276,6 +343,7 @@ export function ChatSessionView({
                             {t('responseInterrupted')}
                           </p>
                         ) : null}
+                        <AssistantSources sources={sources} />
                       </>
                     ) : (
                       <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
@@ -291,23 +359,37 @@ export function ChatSessionView({
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="border-t border-[var(--convergekit-line)] bg-white p-4">
+      <div className="shrink-0 border-t border-[var(--convergekit-line)] bg-[var(--convergekit-bg)] px-4 pb-3.5 pt-3">
         {displayedError ? <p className="mb-2 text-sm text-destructive">{displayedError}</p> : null}
 
-        <PromptInput className="shadow-sm" onSubmit={handlePromptSubmit}>
+        <PromptInput
+          className="w-full rounded-[10px] border border-[var(--convergekit-line-strong)] bg-[var(--convergekit-bg)] shadow-none"
+          onSubmit={handlePromptSubmit}
+        >
           <PromptInputTextarea
-            className={cn('min-h-20', isBusy && 'cursor-not-allowed opacity-60')}
+            className={cn(
+              'max-h-36 min-h-0 flex-1 py-1 text-[13.5px] leading-[1.5]',
+              isBusy && 'cursor-not-allowed opacity-60',
+            )}
             disabled={isBusy}
             onChange={handleInputChange}
             placeholder={t('placeholder')}
             value={input}
           />
-          <div className="flex items-end p-2">
+          <div className="flex shrink-0 items-center gap-2 py-2 pl-2 pr-2">
+            <span className="hidden text-[11px] text-[var(--convergekit-ink-4)] sm:inline">
+              ↩ to send
+            </span>
             <PromptInputSubmit
+              className="h-7 gap-1.5 rounded-md px-2.5 text-xs"
               disabled={!isGenerating && (submitting || !input.trim())}
               onStop={stop}
+              size="sm"
               status={status}
-            />
+            >
+              <Send className="h-3 w-3" />
+              <span>{isGenerating ? 'Stop' : 'Send'}</span>
+            </PromptInputSubmit>
           </div>
         </PromptInput>
       </div>

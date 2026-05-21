@@ -1,18 +1,13 @@
 'use client'
 
+import { AlignmentChip, EvidenceChip, StackedTierBar } from '@/components/ui/evidence-chip'
 import { repositoriesApi } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import type { RepositoryGuideSummary } from '@convergekit/types'
-import { Settings } from 'lucide-react'
-import { useLocale, useTranslations } from 'next-intl'
+import { Download, Info, RefreshCw } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
-import { EvidenceChip, StackedTierBar } from '@/components/ui/evidence-chip'
-import {
-  getAdvancedSettingsHref,
-  getEvidenceLabelTone,
-  getRepoGuideViewState,
-  shouldShowMetadataRefreshHint,
-} from './repo-guide-tab-state'
+import { getRepoGuideViewState, shouldShowMetadataRefreshHint } from './repo-guide-tab-state'
 
 type Props = {
   repositoryId: string
@@ -22,22 +17,40 @@ type Props = {
 }
 
 type GuideArea = RepositoryGuideSummary['areas'][number]
-type QuestionStarter = RepositoryGuideSummary['questionStarters'][number]
+type QuestionCard = RepositoryGuideSummary['questionCards'][number]
 type EvidenceTier = GuideArea['evidenceShare'][number]['tier']
-type EvidenceLabel = RepositoryGuideSummary['evidenceTotals'][number]['label']
 
-const EVIDENCE_LABEL_TIERS: Record<EvidenceLabel, EvidenceTier> = {
-  Code: 'A',
-  Tests: 'B',
-  Docs: 'C',
-  'Design/History': 'D',
+const TIER_LABELS: Record<EvidenceTier, string> = {
+  A: 'Code',
+  B: 'Tests',
+  C: 'Docs',
+  D: 'Design / History',
+}
+
+const ALIGNMENT_LABELS: Record<QuestionCard['alignment'], string> = {
+  ok: 'Aligned',
+  stale: 'Stale',
+  conflict: 'Conflicting',
+}
+
+const CONFIDENCE_TONES: Record<GuideArea['confidenceLabel'], string> = {
+  'Very strong':
+    'border-[var(--convergekit-align-ok-bd)]/25 bg-[var(--convergekit-align-ok-bg)] text-[var(--convergekit-align-ok-fg)]',
+  Strong:
+    'border-[var(--convergekit-align-ok-bd)]/25 bg-[var(--convergekit-align-ok-bg)] text-[var(--convergekit-align-ok-fg)]',
+  'Mixed with docs':
+    'border-[var(--convergekit-auth-c-bd)]/25 bg-[var(--convergekit-auth-c-bg)] text-[var(--convergekit-auth-c-fg)]',
+  'Gated history':
+    'border-[var(--convergekit-align-stale-bd)]/25 bg-[var(--convergekit-align-stale-bg)] text-[var(--convergekit-align-stale-fg)]',
+  Limited:
+    'border-[var(--convergekit-line)] bg-[var(--convergekit-bg-3)] text-[var(--convergekit-ink-3)]',
 }
 
 export function RepoGuideTab({ repositoryId, status }: Props) {
   const t = useTranslations('repositoryDetail.repoGuide')
-  const locale = useLocale()
   const [guide, setGuide] = useState<RepositoryGuideSummary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -72,6 +85,32 @@ export function RepoGuideTab({ repositoryId, status }: Props) {
     })
   }, [guide, status])
 
+  async function handleRefresh() {
+    setRefreshing(true)
+    setError(null)
+    try {
+      const { guide } = await repositoriesApi.getGuide(repositoryId)
+      setGuide(guide)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to refresh repo guide')
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  function handleExport() {
+    if (!guide) return
+    const blob = new Blob([JSON.stringify(guide, null, 2)], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `repo-guide-${repositoryId}.json`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (loading)
     return <GuideLoading title={t('preparingTitle')} description={t('preparingDescription')} />
 
@@ -88,12 +127,36 @@ export function RepoGuideTab({ repositoryId, status }: Props) {
   }
 
   return (
-    <div className="space-y-5">
-      <header>
-        <h2 className="text-lg font-semibold text-[var(--convergekit-ink)]">{t('headline')}</h2>
-        <p className="mt-1 max-w-2xl text-sm text-[var(--convergekit-ink-3)]">
-          {t('headlineDescription')}
-        </p>
+    <div className="flex h-full min-h-[min(720px,calc(100vh-18rem))] w-full flex-col gap-3.5 py-5">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold tracking-normal text-[var(--convergekit-ink)]">
+            Repo Guide
+          </h2>
+          <p className="mt-1 max-w-2xl text-[13px] leading-5 text-[var(--convergekit-ink-3)]">
+            Two lenses on the same evidence - coverage by area, and what the repo can answer with
+            confidence.
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-1.5">
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-[var(--convergekit-line)] bg-white px-3 text-xs font-medium text-[var(--convergekit-ink-2)] shadow-sm transition-colors hover:bg-[var(--convergekit-bg-3)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
+            Re-rank
+          </button>
+          <button
+            type="button"
+            onClick={handleExport}
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-[var(--convergekit-line)] bg-white px-3 text-xs font-medium text-[var(--convergekit-ink-2)] shadow-sm transition-colors hover:bg-[var(--convergekit-bg-3)]"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export
+          </button>
+        </div>
       </header>
 
       {shouldShowMetadataRefreshHint(guide.metadataStatus) && (
@@ -102,39 +165,22 @@ export function RepoGuideTab({ repositoryId, status }: Props) {
         </div>
       )}
 
-      <CoveragePanel guide={guide} showComputingHint={viewState === 'computing-areas'} />
-
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.72fr)]">
-        <HowToReadPanel />
-        <PhrasingTip />
+      <div
+        className="grid h-[min(680px,calc(100vh-20rem))] min-h-[520px] min-w-0 grid-cols-1 gap-3.5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 34rem), 1fr))' }}
+      >
+        <CurrentRepoGuide guide={guide} showComputingHint={viewState === 'computing-areas'} />
+        <ProposedRepoGuide cards={guide.questionCards} />
       </div>
 
-      <CoachingPanel starters={guide.questionStarters} />
-
-      <AdvancedSettingsFooter locale={locale} repositoryId={repositoryId} />
-    </div>
-  )
-}
-
-function AdvancedSettingsFooter({
-  locale,
-  repositoryId,
-}: {
-  locale: string
-  repositoryId: string
-}) {
-  const t = useTranslations('repositoryDetail.repoGuide')
-
-  return (
-    <div className="flex flex-col gap-3 rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-      <p className="min-w-0 text-[var(--convergekit-ink-3)]">{t('advancedSettingsHint')}</p>
-      <a
-        href={getAdvancedSettingsHref(locale, repositoryId)}
-        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-[var(--convergekit-line)] bg-white px-3 py-1.5 font-medium text-[var(--convergekit-ink-2)] transition-colors hover:bg-[var(--convergekit-bg-3)]"
-      >
-        <Settings className="h-3.5 w-3.5" />
-        {t('advancedSettingsAction')}
-      </a>
+      <div className="flex items-start gap-3 rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white px-4 py-3 text-[13px] leading-5 text-[var(--convergekit-ink-2)] shadow-sm">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--convergekit-ink-3)]" />
+        <p>
+          <strong className="font-semibold text-[var(--convergekit-ink)]">Reading both:</strong>{' '}
+          Coverage shows where the index is densest. Questions shows what users can actually ask
+          with confidence - the same evidence, projected onto questions instead of folders.
+        </p>
+      </div>
     </div>
   )
 }
@@ -151,139 +197,202 @@ function GuideLoading({ title, description }: { title: string; description: stri
   )
 }
 
-function CoveragePanel({
+function CurrentRepoGuide({
   guide,
   showComputingHint,
 }: {
   guide: RepositoryGuideSummary
   showComputingHint: boolean
 }) {
-  const t = useTranslations('repositoryDetail.repoGuide')
-
   return (
-    <section className="rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+    <section className="flex min-h-0 flex-col overflow-hidden rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white shadow-sm">
+      <div className="flex items-start justify-between gap-3 border-b border-[var(--convergekit-line)] px-4 py-3.5">
+        <div className="min-w-0">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--convergekit-ink-4)]">
+            Current
+          </div>
           <h3 className="text-base font-semibold text-[var(--convergekit-ink)]">
-            {t('coverageTitle')}
+            Coverage by repository area
           </h3>
-          <p className="mt-1 text-sm text-[var(--convergekit-ink-3)]">
-            {t('coverageDescription')}
+          <p className="mt-1 text-xs leading-5 text-[var(--convergekit-ink-3)]">
+            Shows where evidence is strong, ranked by the mind-map.
           </p>
         </div>
         {showComputingHint && (
-          <div className="rounded-full border border-[var(--convergekit-line)] bg-[var(--convergekit-bg-3)] px-3 py-1 text-xs font-medium text-[var(--convergekit-ink-3)]">
-            {t('computingAreas')}
+          <span className="rounded-full border border-[var(--convergekit-line)] bg-[var(--convergekit-bg-3)] px-2.5 py-1 text-[11px] font-medium text-[var(--convergekit-ink-3)]">
+            Computing areas
+          </span>
+        )}
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto p-4">
+        <TierLegend />
+
+        {guide.areas.length === 0 ? (
+          <p className="mt-4 rounded-md border border-[var(--convergekit-line)] bg-[var(--convergekit-bg-2)] px-3 py-2 text-sm text-[var(--convergekit-ink-3)]">
+            No repository areas are ready yet.
+          </p>
+        ) : (
+          <div className="mt-4 flex flex-col gap-3.5">
+            {guide.areas.map((area) => (
+              <AreaCoverageRow key={area.name} area={area} />
+            ))}
           </div>
         )}
       </div>
-
-      {showComputingHint && (
-        <p className="mt-3 text-sm text-[var(--convergekit-ink-3)]">{t('computingAreasDescription')}</p>
-      )}
-
-      <div className="mt-4 space-y-4">
-        {guide.areas.map((area) => (
-          <div key={area.name}>
-            <div className="mb-1 flex items-center justify-between gap-3 text-sm">
-              <span className="font-medium text-[var(--convergekit-ink-2)]">{area.name}</span>
-              <span className="text-[var(--convergekit-ink-3)]">{area.confidenceLabel}</span>
-            </div>
-            <EvidenceStack area={area} />
-          </div>
-        ))}
-      </div>
     </section>
   )
 }
 
-function EvidenceStack({ area }: { area: GuideArea }) {
+function AreaCoverageRow({ area }: { area: GuideArea }) {
   const shares = area.evidenceShare.filter((share) => share.fileCount > 0)
-  if (shares.length === 0) return <div className="h-1.5 rounded-full bg-[var(--convergekit-bg-3)]" />
 
   return (
-    <StackedTierBar
-      tiers={Object.fromEntries(shares.map((share) => [share.tier, share.fileCount]))}
-    />
-  )
-}
-
-function HowToReadPanel() {
-  const t = useTranslations('repositoryDetail.repoGuide')
-  const rows = [
-    {
-      label: t('currentBehavior'),
-      evidence: t('currentBehaviorEvidence'),
-      tone: getEvidenceLabelTone('Code'),
-    },
-    {
-      label: t('setupDeploy'),
-      evidence: t('setupDeployEvidence'),
-      tone: getEvidenceLabelTone('Docs'),
-    },
-    {
-      label: t('whyHistory'),
-      evidence: t('whyHistoryEvidence'),
-      tone: getEvidenceLabelTone('Design/History'),
-    },
-    {
-      label: t('skippedNoise'),
-      evidence: t('skippedNoiseEvidence'),
-      tone: 'border-neutral-200 bg-neutral-50 text-neutral-500',
-    },
-  ]
-
-  return (
-    <section className="rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white p-4">
-      <h3 className="text-base font-semibold text-[var(--convergekit-ink)]">{t('howToReadTitle')}</h3>
-      <div className="mt-4 space-y-3">
-        {rows.map((row) => (
-          <div key={row.label} className="flex items-center justify-between gap-4">
-            <span className="text-sm font-medium text-[var(--convergekit-ink-2)]">{row.label}</span>
-            <span className={cn('rounded-full border px-2 py-0.5 text-xs font-medium', row.tone)}>
-              {row.evidence}
-            </span>
+    <div>
+      <div className="mb-1.5 flex items-baseline justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-[13.5px] font-semibold text-[var(--convergekit-ink)]">
+            {area.name}
           </div>
-        ))}
+          <div className="truncate font-mono text-[11px] text-[var(--convergekit-ink-4)]">
+            {area.pathHint ?? 'path unavailable'}
+          </div>
+        </div>
+        <span
+          className={cn(
+            'inline-flex h-[22px] shrink-0 items-center rounded-full border px-2 text-[11.5px] font-medium',
+            CONFIDENCE_TONES[area.confidenceLabel],
+          )}
+        >
+          {area.confidenceLabel.toLowerCase()} confidence
+        </span>
       </div>
-    </section>
-  )
-}
-
-function PhrasingTip() {
-  const t = useTranslations('repositoryDetail.repoGuide')
-  return (
-    <section className="rounded-[var(--convergekit-radius-lg)] border border-blue-100 bg-blue-50 p-4">
-      <p className="text-sm leading-6 text-blue-800">{t('tip')}</p>
-    </section>
-  )
-}
-
-function CoachingPanel({ starters }: { starters: QuestionStarter[] }) {
-  if (starters.length === 0) return null
-  return (
-    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {starters.map((starter) => (
-        <CoachingCard key={`${starter.intent}-${starter.examplePrompt}`} starter={starter} />
-      ))}
-    </section>
-  )
-}
-
-function CoachingCard({ starter }: { starter: QuestionStarter }) {
-  return (
-    <div className="rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white p-4">
-      <h4 className="text-sm font-semibold text-[var(--convergekit-ink)]">{starter.title}</h4>
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {starter.evidenceLabels.map((label) => (
-          <EvidenceChip key={label} tier={EVIDENCE_LABEL_TIERS[label]}>
-            {label}
-          </EvidenceChip>
-        ))}
+      <StackedTierBar
+        tiers={Object.fromEntries(area.evidenceShare.map((share) => [share.tier, share.fileCount]))}
+      />
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-[var(--convergekit-ink-4)]">
+        {shares.length === 0 ? (
+          <span>No evidence files</span>
+        ) : (
+          shares.map((share) => (
+            <span key={share.tier}>
+              {share.tier} {share.percentage}%
+            </span>
+          ))
+        )}
       </div>
-      <p className="mt-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
-        "{starter.examplePrompt}"
-      </p>
     </div>
   )
+}
+
+function ProposedRepoGuide({ cards }: { cards: QuestionCard[] }) {
+  return (
+    <section className="flex min-h-0 flex-col overflow-hidden rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white shadow-sm">
+      <div className="flex items-start justify-between gap-3 border-b border-[var(--convergekit-line)] px-4 py-3.5">
+        <div className="min-w-0">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--convergekit-ink)]">
+            Question-first
+          </div>
+          <h3 className="text-base font-semibold text-[var(--convergekit-ink)]">
+            What we can answer with high confidence
+          </h3>
+          <p className="mt-1 text-xs leading-5 text-[var(--convergekit-ink-3)]">
+            Cards rank questions by evidence strength, primary tier, and alignment.
+          </p>
+        </div>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-auto p-4">
+        {cards.length === 0 ? (
+          <p className="rounded-md border border-[var(--convergekit-line)] bg-[var(--convergekit-bg-2)] px-3 py-2 text-sm text-[var(--convergekit-ink-3)]">
+            Question routes will appear when evidence is ready.
+          </p>
+        ) : (
+          cards.map((card) => <QuestionConfidenceCard key={card.question} card={card} />)
+        )}
+      </div>
+    </section>
+  )
+}
+
+function QuestionConfidenceCard({ card }: { card: QuestionCard }) {
+  return (
+    <article className="rounded-[10px] border border-[var(--convergekit-line)] bg-[var(--convergekit-bg)] p-3.5">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1.5 flex items-center gap-2">
+            <ConfidenceMeter value={card.confidence} tier={card.primaryTier} />
+            <span className="min-w-0 truncate text-[11.5px] font-medium text-[var(--convergekit-ink-3)]">
+              {card.confidence}/5 · routed via {card.route}
+            </span>
+            <span className="ml-auto shrink-0">
+              <AlignmentChip alignment={card.alignment}>
+                {ALIGNMENT_LABELS[card.alignment]}
+              </AlignmentChip>
+            </span>
+          </div>
+          <h4 className="text-sm font-semibold tracking-normal text-[var(--convergekit-ink)]">
+            {card.question}
+          </h4>
+          <p className="mt-1 text-[12.5px] leading-5 text-[var(--convergekit-ink-3)]">
+            {card.rationale}
+          </p>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {card.sources.map((source) => (
+              <EvidenceChip key={`${source.tier}-${source.label}`} tier={source.tier}>
+                <span className="text-[10px] font-semibold opacity-65">{source.tier}</span>
+                <span>{source.label}</span>
+                {source.count > 1 && <span className="opacity-50">x{source.count}</span>}
+              </EvidenceChip>
+            ))}
+          </div>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function ConfidenceMeter({ value, tier }: { value: number; tier: EvidenceTier }) {
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      {[1, 2, 3, 4, 5].map((segment) => (
+        <span
+          key={segment}
+          className={cn(
+            'h-1.5 w-4 rounded-full bg-[var(--convergekit-bg-3)]',
+            segment <= value && confidenceSegmentClass(tier),
+          )}
+        />
+      ))}
+    </div>
+  )
+}
+
+function TierLegend() {
+  return (
+    <div className="flex flex-wrap gap-x-3.5 gap-y-2 text-[11.5px] text-[var(--convergekit-ink-3)]">
+      {(['A', 'B', 'C', 'D'] as const).map((tier) => (
+        <span key={tier} className="inline-flex items-center gap-1.5">
+          <span className={cn('h-[9px] w-[9px] rounded-[2px]', tierDotClass(tier))} />
+          Tier {tier} · {TIER_LABELS[tier]}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function confidenceSegmentClass(tier: EvidenceTier) {
+  return {
+    A: 'bg-[var(--convergekit-auth-a-bd)]',
+    B: 'bg-[var(--convergekit-auth-b-bd)]',
+    C: 'bg-[var(--convergekit-auth-c-bd)]',
+    D: 'bg-[var(--convergekit-auth-d-bd)]',
+  }[tier]
+}
+
+function tierDotClass(tier: EvidenceTier) {
+  return {
+    A: 'bg-[var(--convergekit-auth-a-bd)]',
+    B: 'bg-[var(--convergekit-auth-b-bd)]',
+    C: 'bg-[var(--convergekit-auth-c-bd)]',
+    D: 'bg-[var(--convergekit-auth-d-bd)]',
+  }[tier]
 }

@@ -2,13 +2,16 @@ import { SourceFilesAccordion } from '@/components/wiki/source-files-accordion'
 import { getWikiLayoutClasses } from '@/components/wiki/wiki-layout-config'
 import { WikiPageContent } from '@/components/wiki/wiki-page-content'
 import { WikiToc } from '@/components/wiki/wiki-toc'
-import { getWebBaseUrl } from '@/lib/runtime-urls'
+import type { WikiSection } from '@/lib/api-client'
+import { getApiBaseUrl } from '@/lib/runtime-urls'
 import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
-const WEB_URL = getWebBaseUrl()
+const API_URL = getApiBaseUrl()
+const GENERATED_SOURCE_DETAILS_RE = /\s*<details>\s*<summary>Relevant source files<\/summary>[\s\S]*?<\/details>\s*/i
+const FIRST_H2_RE = /^##\s+/m
 
 interface Props {
   params: Promise<{ id: string; slug: string; locale: string }>
@@ -19,7 +22,7 @@ async function fetchWikiPage(repositoryId: string, slug: string, locale: string)
   const cookieHeader = cookieStore.toString()
   let res: Response
   try {
-    res = await fetch(`${WEB_URL}/api/wiki/${repositoryId}/pages/${slug}`, {
+    res = await fetch(`${API_URL}/api/wiki/${repositoryId}/pages/${slug}`, {
       headers: { cookie: cookieHeader },
       cache: 'no-store',
     })
@@ -33,9 +36,46 @@ async function fetchWikiPage(repositoryId: string, slug: string, locale: string)
   return { status: res.status, data: await res.json() }
 }
 
+async function fetchWikiPages(repositoryId: string, locale: string) {
+  const cookieStore = await cookies()
+  const cookieHeader = cookieStore.toString()
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}/api/wiki/${repositoryId}/pages`, {
+      headers: { cookie: cookieHeader },
+      cache: 'no-store',
+    })
+  } catch {
+    return null
+  }
+
+  if (res.status === 401) redirect(`/${locale}/auth/sign-in`)
+  if (!res.ok) return null
+  return res.json() as Promise<{ sections: WikiSection[] }>
+}
+
+function splitWikiContentForSourceAccordion(content: string) {
+  const contentWithoutGeneratedSources = content.replace(GENERATED_SOURCE_DETAILS_RE, '\n\n')
+  const firstH2Match = contentWithoutGeneratedSources.match(FIRST_H2_RE)
+  if (firstH2Match?.index == null) {
+    return {
+      intro: contentWithoutGeneratedSources,
+      body: '',
+    }
+  }
+
+  return {
+    intro: contentWithoutGeneratedSources.slice(0, firstH2Match.index).trimEnd(),
+    body: contentWithoutGeneratedSources.slice(firstH2Match.index).trimStart(),
+  }
+}
+
 export default async function WikiPageView({ params }: Props) {
   const { id, slug, locale } = await params
-  const result = await fetchWikiPage(id, slug, locale)
+  const [result, pagesResult] = await Promise.all([
+    fetchWikiPage(id, slug, locale),
+    fetchWikiPages(id, locale),
+  ])
 
   if (!result) notFound()
 
@@ -66,19 +106,42 @@ export default async function WikiPageView({ params }: Props) {
   }
 
   const layoutClasses = getWikiLayoutClasses()
+  const relatedPages = (pagesResult?.sections ?? []).flatMap((section) => {
+    const donePages = section.pages.filter((relatedPage) => relatedPage.status === 'done')
+    const firstRelatedPage = donePages.find((relatedPage) => relatedPage.slug !== page.slug) ?? donePages[0]
+
+    return [
+      ...(firstRelatedPage ? [{ title: section.title, slug: firstRelatedPage.slug }] : []),
+      ...donePages
+        .filter((relatedPage) => relatedPage.slug !== page.slug)
+        .map((relatedPage) => ({ title: relatedPage.title, slug: relatedPage.slug })),
+    ]
+  })
+  const splitContent = splitWikiContentForSourceAccordion(page.content)
 
   return (
     <div className={layoutClasses.articleRow}>
       <article className={layoutClasses.article} data-wiki-content="">
+        {splitContent.intro && (
+          <WikiPageContent
+            content={splitContent.intro}
+            wikiBasePath={`/${locale}/repositories/${id}/wiki`}
+            sourceFileMetadata={page.sourceFileMetadata ?? undefined}
+            relatedPages={relatedPages}
+          />
+        )}
         <SourceFilesAccordion
           sourceFiles={page.sourceFiles ?? null}
           sourceFileMetadata={page.sourceFileMetadata ?? null}
         />
-        <WikiPageContent
-          content={page.content}
-          wikiBasePath={`/${locale}/repositories/${id}/wiki`}
-          sourceFileMetadata={page.sourceFileMetadata ?? undefined}
-        />
+        {splitContent.body && (
+          <WikiPageContent
+            content={splitContent.body}
+            wikiBasePath={`/${locale}/repositories/${id}/wiki`}
+            sourceFileMetadata={page.sourceFileMetadata ?? undefined}
+            relatedPages={relatedPages}
+          />
+        )}
       </article>
 
       <aside className={layoutClasses.pageToc}>
