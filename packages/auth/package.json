@@ -18,7 +18,7 @@
     "better-auth": "^1.6.9",
     "drizzle-orm": "^0.45.2",
     "ioredis": "^5.4.2",
-    "samlify": "^2.12.0",
+    "samlify": "^2.13.0",
     "zod": "^4.4.1"
   },
   "devDependencies": {
