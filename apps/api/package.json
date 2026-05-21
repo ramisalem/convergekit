@@ -13,9 +13,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@bull-board/api": "^6.5.0",
-    "@bull-board/hono": "^6.5.0",
-    "@hono/node-server": "^1.19.13",
+    "@bull-board/api": "^7.1.5",
+    "@bull-board/hono": "^7.1.5",
+    "@hono/node-server": "^2.0.3",
     "@convergekit/ai": "workspace:*",
     "@convergekit/auth": "workspace:*",
     "@convergekit/config": "workspace:*",
@@ -24,15 +24,15 @@
     "@convergekit/queues": "workspace:*",
     "@convergekit/types": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "ai": "^5.0.180",
-    "better-auth": "^1.6.9",
-    "bullmq": "^5.76.4",
+    "ai": "^6.0.188",
+    "better-auth": "^1.6.11",
+    "bullmq": "^5.76.10",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.12.18",
+    "hono": "^4.12.21",
     "ioredis": "^5.4.2",
-    "nanoid": "^5.1.9",
-    "pino": "^9.6.0",
-    "zod": "^4.4.1"
+    "nanoid": "^5.1.11",
+    "pino": "^10.3.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",

@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@convergekit/types": "workspace:*",
-    "bullmq": "^5.76.4",
+    "bullmq": "^5.76.10",
     "ioredis": "^5.4.2"
   },
   "devDependencies": {

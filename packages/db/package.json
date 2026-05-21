@@ -24,9 +24,9 @@
   "dependencies": {
     "@convergekit/ai": "workspace:*",
     "@convergekit/types": "workspace:*",
-    "better-sqlite3": "^11.8.1",
+    "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.5"
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
