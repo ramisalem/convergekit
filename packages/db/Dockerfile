@@ -18,4 +18,4 @@ COPY packages/ packages/
 ARG IMAGE_BUILD_CACHE_BUST
 LABEL dev.convergekit.image-build-cache-bust="${IMAGE_BUILD_CACHE_BUST}"
 
-CMD ["pnpm", "--filter", "@convergekit/db", "db:migrate"]
+CMD ["pnpm", "--filter", "@convergekit/db", "db:deploy"]

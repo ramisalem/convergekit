@@ -1,6 +1,16 @@
 import { accessPolicyConfig } from '@convergekit/config/access-policy'
+import { resolveMcpOAuthConfig } from '@convergekit/config/mcp-oauth'
 import { resolveWorkforceSsoConfig } from '@convergekit/config/workforce-sso'
-import { account, db, session, user, verification } from '@convergekit/db'
+import {
+  account,
+  db,
+  oauthAccessToken,
+  oauthApplication,
+  oauthConsent,
+  session,
+  user,
+  verification,
+} from '@convergekit/db'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { eq, sql } from 'drizzle-orm'
@@ -15,6 +25,7 @@ import {
   resolveOAuthUserCreate,
 } from './bootstrap-admin.js'
 import { completePendingInvitesForLinkedAccount } from './invitation-completion.js'
+import { buildMcpOAuthPlugins } from './mcp-oauth-plugin.js'
 import { buildAuthSocialProviders } from './social-providers.js'
 import { WORKFORCE_SAML_PROVIDER_ID } from './workforce-saml-policy.js'
 import { workforceSamlPlugin } from './workforce-saml-plugin.js'
@@ -50,7 +61,7 @@ export const auth = betterAuth({
   },
   database: drizzleAdapter(db, {
     provider: 'pg',
-    schema: { user, session, account, verification },
+    schema: { user, session, account, verification, oauthApplication, oauthAccessToken, oauthConsent },
   }),
   socialProviders,
   emailAndPassword: {
@@ -74,6 +85,7 @@ export const auth = betterAuth({
       },
       onAccountLinked: completePendingInvitesForLinkedAccount,
     }),
+    ...buildMcpOAuthPlugins(resolveMcpOAuthConfig(process.env)),
   ],
   advanced: buildAdvancedAuthConfig({
     nodeEnv: process.env.NODE_ENV,

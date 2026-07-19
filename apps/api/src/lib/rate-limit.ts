@@ -33,7 +33,6 @@ const SCOPES: Record<string, RateLimitConfig> = {
   'auth-signin': { windowMs: 300_000, maxRequests: 5 },
   'mcp-token': { windowMs: 60_000, maxRequests: 120 },
   'mcp-user': { windowMs: 60_000, maxRequests: 300 },
-  'mcp-repo': { windowMs: 60_000, maxRequests: 600 },
 }
 
 export async function checkRateLimit(

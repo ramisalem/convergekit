@@ -28,6 +28,14 @@ export interface EmbeddingProfile extends ResolvedEmbeddingProfile {
   dimensions: number
 }
 
+export class EmbeddingProviderUnavailableError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message)
+    this.name = 'EmbeddingProviderUnavailableError'
+    this.cause = options?.cause
+  }
+}
+
 function normalizeEndpoint(endpoint?: string | null): string | null {
   return endpoint ? endpoint.replace(/\/+$/, '') : null
 }
@@ -162,13 +170,64 @@ function sanitize(s: string): string {
     .slice(0, MAX_CHUNK_CHARS)
 }
 
+function summarizeEmbeddingError(err: unknown): Record<string, unknown> {
+  if (!err || typeof err !== 'object') {
+    return { message: String(err) }
+  }
+
+  const error = err as {
+    name?: string
+    message?: string
+    statusCode?: number
+    url?: string
+    isRetryable?: boolean
+    data?: unknown
+  }
+
+  return {
+    name: error.name,
+    message: error.message,
+    statusCode: error.statusCode,
+    url: error.url,
+    isRetryable: error.isRetryable,
+    data: error.data,
+  }
+}
+
+function isPermanentEmbeddingProviderError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+
+  const error = err as { message?: string; statusCode?: number; isRetryable?: boolean }
+  const message = error.message?.toLowerCase() ?? ''
+
+  return (
+    error.statusCode === 401 ||
+    error.statusCode === 403 ||
+    message.includes('key limit exceeded') ||
+    message.includes('invalid api key') ||
+    message.includes('insufficient credits') ||
+    message.includes('unauthorized')
+  )
+}
+
+function permanentEmbeddingProviderMessage(err: unknown): string {
+  if (!err || typeof err !== 'object') return String(err)
+  const error = err as { message?: string; statusCode?: number }
+  return error.message ?? `Embedding provider failed with status ${error.statusCode ?? 'unknown'}`
+}
+
 /** Embed a single string, returning null on failure so one bad chunk doesn't block others. */
 async function embedOne(value: string, options?: EmbeddingModelOptions): Promise<number[] | null> {
   try {
     const { embedding } = await embed({ model: getEmbeddingModel(options), value })
     return embedding
   } catch (err) {
-    logger.warn({ err }, 'Single chunk embedding failed — skipping')
+    if (isPermanentEmbeddingProviderError(err)) {
+      throw new EmbeddingProviderUnavailableError(permanentEmbeddingProviderMessage(err), {
+        cause: err,
+      })
+    }
+    logger.warn({ err: summarizeEmbeddingError(err) }, 'Single chunk embedding failed — skipping')
     return null
   }
 }
@@ -180,27 +239,53 @@ export async function embedChunks(
   if (contents.length === 0) return []
 
   const sanitized = contents.map(sanitize)
-  logger.debug({ count: sanitized.length, batchSize: EMBED_BATCH_SIZE }, 'Embedding chunks')
+  const embeddable = sanitized
+    .map((value, index) => ({ value, index }))
+    .filter(({ value }) => value.trim().length > 0)
+  logger.debug(
+    {
+      count: embeddable.length,
+      skippedEmpty: sanitized.length - embeddable.length,
+      batchSize: EMBED_BATCH_SIZE,
+    },
+    'Embedding chunks',
+  )
 
-  const results: (number[] | null)[] = []
+  const results: (number[] | null)[] = Array.from({ length: contents.length }, () => null)
 
-  for (let i = 0; i < sanitized.length; i += EMBED_BATCH_SIZE) {
-    const batch = sanitized.slice(i, i + EMBED_BATCH_SIZE)
+  for (let i = 0; i < embeddable.length; i += EMBED_BATCH_SIZE) {
+    const batch = embeddable.slice(i, i + EMBED_BATCH_SIZE)
+    const values = batch.map(({ value }) => value)
     try {
-      const { embeddings } = await embedMany({ model: getEmbeddingModel(options), values: batch })
-      results.push(...embeddings)
-    } catch {
+      const { embeddings } = await embedMany({ model: getEmbeddingModel(options), values })
+      for (let offset = 0; offset < batch.length; offset++) {
+        results[batch[offset].index] = embeddings[offset] ?? null
+      }
+    } catch (err) {
+      if (isPermanentEmbeddingProviderError(err)) {
+        logger.warn(
+          { err: summarizeEmbeddingError(err), batchStart: i, batchSize: batch.length },
+          'Embedding provider rejected the batch permanently',
+        )
+        throw new EmbeddingProviderUnavailableError(permanentEmbeddingProviderMessage(err), {
+          cause: err,
+        })
+      }
+
       // Batch failed — fall back to one-by-one so a single bad chunk
       // doesn't abort the entire indexing job.
       logger.warn(
-        { batchStart: i, batchSize: batch.length },
+        { err: summarizeEmbeddingError(err), batchStart: i, batchSize: batch.length },
         'Batch embedding failed, retrying one-by-one',
       )
-      for (const value of batch) {
-        results.push(await embedOne(value, options))
+      for (const { value, index } of batch) {
+        results[index] = await embedOne(value, options)
       }
     }
-    logger.debug({ done: results.length, total: sanitized.length }, 'Embedding progress')
+    logger.debug(
+      { done: Math.min(i + batch.length, embeddable.length), total: embeddable.length },
+      'Embedding progress',
+    )
   }
 
   return results

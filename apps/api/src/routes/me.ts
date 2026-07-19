@@ -23,6 +23,7 @@ meRoutes.get('/', async (c) => {
       image: user.image,
       role: user.role,
       groupId: user.groupId,
+      ciTokensEnabled: user.ciTokensEnabled,
     })
     .from(user)
     .where(eq(user.id, userId))

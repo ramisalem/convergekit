@@ -2,6 +2,7 @@
 
 import { SignOutButton } from '@/components/sign-out-button'
 import { meApi, type SupportContact } from '@/lib/api-client'
+import { clearRepositoryCache, setRepositoryCacheOwner } from '@/lib/repository-cache'
 import { getApiBaseUrl } from '@/lib/runtime-urls'
 import { useTranslations } from 'next-intl'
 import { createContext, useContext, useEffect, useState } from 'react'
@@ -15,6 +16,7 @@ type UserData = {
   image?: string | null
   role: 'admin' | 'user'
   groupId: string | null
+  ciTokensEnabled: boolean
   supportContacts: SupportContact[]
 } | null
 
@@ -35,18 +37,24 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       .then((r) => (r.ok ? r.json() : null))
       .then(async (session) => {
         if (!session?.user?.id) {
+          clearRepositoryCache()
           setUser(null)
           return
         }
         // Fetch full user profile with role from /api/me
         try {
           const { user: meUser, supportContacts } = await meApi.get()
+          setRepositoryCacheOwner(meUser.id)
           setUser({ ...meUser, supportContacts: supportContacts ?? [] })
         } catch {
+          clearRepositoryCache()
           setUser(null)
         }
       })
-      .catch(() => setUser(null))
+      .catch(() => {
+        clearRepositoryCache()
+        setUser(null)
+      })
       .finally(() => setLoading(false))
   }, [])
 

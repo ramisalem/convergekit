@@ -8,6 +8,7 @@
 import type { EmbeddingModelOptions } from '@convergekit/ai'
 import type { RetrievalPolicy } from '@convergekit/db'
 import { getDocumentByPath, getDocumentPaths, searchChunks } from '@convergekit/db'
+import { searchDocsQuerySchema } from '@convergekit/mcp'
 import { tool } from 'ai'
 import { z } from 'zod'
 
@@ -42,7 +43,7 @@ export function searchDocsTool(
     description:
       'Search the codebase for relevant code snippets and documentation using hybrid semantic + keyword search. Returns the top matching chunks with file path and line numbers for source attribution.',
     inputSchema: z.object({
-      query: z.string().min(1).max(500).describe('The search query'),
+      query: searchDocsQuerySchema,
       limit: z
         .number()
         .int()

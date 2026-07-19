@@ -362,14 +362,14 @@
     white-space: pre;
   }
 
-  .settings-token-table th,
-  .settings-token-table td {
+  .ci-token-table th,
+  .ci-token-table td {
     border-bottom: 1px solid var(--convergekit-line-2);
     padding: 12px 20px;
     vertical-align: top;
   }
 
-  .settings-token-table th {
+  .ci-token-table th {
     background: var(--convergekit-bg-2);
     border-bottom: 1px solid var(--convergekit-line);
     color: var(--convergekit-ink-3);
@@ -382,15 +382,15 @@
     white-space: nowrap;
   }
 
-  .settings-token-table tbody tr:last-child td {
+  .ci-token-table tbody tr:last-child td {
     border-bottom: 0;
   }
 
-  .settings-token-table tbody tr:hover td {
+  .ci-token-table tbody tr:hover td {
     background: var(--convergekit-bg-2);
   }
 
-  .settings-token-actions {
+  .ci-token-actions {
     display: flex;
     flex-wrap: nowrap;
     gap: 4px;
@@ -398,11 +398,11 @@
     white-space: nowrap;
   }
 
-  .settings-token-actions button {
+  .ci-token-actions button {
     white-space: nowrap;
   }
 
-  .settings-token-health-cell {
+  .ci-token-health-cell {
     white-space: nowrap;
   }
 

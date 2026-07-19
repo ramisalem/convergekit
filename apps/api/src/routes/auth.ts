@@ -2,6 +2,7 @@ import { auth } from '@convergekit/auth'
 import { accessPolicyConfig, isAllowedAccessPolicyEmail } from '@convergekit/config/access-policy'
 import { resolveWorkforceSsoConfig } from '@convergekit/config/workforce-sso'
 import { Hono } from 'hono'
+import { wellKnownRoutes } from './well-known.js'
 
 export const authRoutes = new Hono()
 const workforceSsoConfig = resolveWorkforceSsoConfig(process.env, accessPolicyConfig)
@@ -21,7 +22,7 @@ authRoutes.post('/sign-in/email', async (c) => {
   if (workforceSsoConfig.workforceSsoEnabled) {
     return c.json(
       {
-        error: 'Email/password sign-in is disabled. Please use Workforce SSO.',
+        error: 'Email/password sign-in is disabled. Please use ConvergeKit SSO.',
         code: 'EMAIL_SIGN_IN_DISABLED',
       },
       403,
@@ -43,6 +44,9 @@ authRoutes.post('/sign-in/email', async (c) => {
 
   return auth.handler(c.req.raw)
 })
+
+// Shadow the better-auth MCP plugin's stale /.well-known docs with ours.
+authRoutes.route('/.well-known', wellKnownRoutes)
 
 // Forward all /api/auth/* requests to the better-auth handler.
 // better-auth handles OAuth redirects, callbacks, session management, and sign-out.

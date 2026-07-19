@@ -15,7 +15,10 @@
       "dependsOn": ["^build"]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "outputs": []
+    },
+    "test:coverage": {
+      "outputs": ["coverage/**"]
     },
     "typecheck": {
       "dependsOn": ["^build"]

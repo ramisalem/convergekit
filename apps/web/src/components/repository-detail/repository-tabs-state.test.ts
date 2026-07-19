@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { getAvailableRepositoryTabs, normalizeRepositoryTab } from './repository-tabs-state'
 
 describe('normalizeRepositoryTab', () => {
-  it('defaults to guide when no tab is specified', () => {
-    expect(normalizeRepositoryTab(null)).toBe('guide')
+  it('defaults to chat when no tab is specified', () => {
+    expect(normalizeRepositoryTab(null)).toBe('chat')
+  })
+
+  it('defaults unrecognized tab values to chat', () => {
+    expect(normalizeRepositoryTab('banana')).toBe('chat')
   })
 
   it('maps old structure urls to guide', () => {

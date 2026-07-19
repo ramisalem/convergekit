@@ -1,25 +1,48 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useTranslations } from 'next-intl'
-import { CheckCircle, FileText, Search } from 'lucide-react'
-import { CodeBlock } from '@/components/ai-elements/code-block'
-import { cn } from '@/lib/utils'
-import { useJobProgress } from '@/lib/use-job-progress'
+import type { DocumentContent, DocumentPath, WikiSection } from '@/lib/api-client'
 import { documentsApi, wikiApi } from '@/lib/api-client'
-import type { DocumentPath, DocumentContent, WikiSection } from '@/lib/api-client'
-import { DocumentFileTree } from './document-file-tree'
-import { getDocumentCodeLanguage } from './document-code-language'
+import { useJobProgress } from '@/lib/use-job-progress'
+import { cn } from '@/lib/utils'
+import { CheckCircle, FileText, Search } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { useTranslations } from 'next-intl'
+import { useEffect, useRef, useState } from 'react'
 import { getDocsTabPhase, shouldPollWikiPages, type DocsPhase } from './docs-tab-state'
+import { getDocumentCodeLanguage } from './document-code-language'
+import { DocumentFileTree } from './document-file-tree'
 
 interface Props {
   repositoryId: string
   status: 'pending' | 'processing' | 'done' | 'failed'
   jobId?: string | null
   queue?: string
+  indexingFailure?: { message: string } | null
 }
 
 const CIRCUMFERENCE = 2 * Math.PI * 28
+
+type LazyCodeBlockProps = {
+  className?: string
+  code: string
+  language: NonNullable<ReturnType<typeof getDocumentCodeLanguage>>
+  showLineNumbers?: boolean
+}
+
+const CodeBlock = dynamic<LazyCodeBlockProps>(
+  () => import('@/components/ai-elements/code-block').then((module) => module.CodeBlock),
+  {
+    loading: () => null,
+  },
+)
+
+function RawCodeFallback({ code }: { code: string }) {
+  return (
+    <pre className="document-raw-viewer flex-1 overflow-auto whitespace-pre-wrap break-all p-4 font-mono text-xs leading-relaxed text-[var(--convergekit-ink-2)]">
+      {code}
+    </pre>
+  )
+}
 
 function CircularProgress({
   pct,
@@ -35,21 +58,34 @@ function CircularProgress({
   return (
     <div className="relative flex h-16 w-16 items-center justify-center">
       <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 64 64">
-        <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="4" className="text-neutral-100" />
         <circle
-          cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="4"
+          cx="32"
+          cy="32"
+          r="28"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="4"
+          className="text-neutral-100"
+        />
+        <circle
+          cx="32"
+          cy="32"
+          r="28"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="4"
           className={cn(
             indeterminate && 'animate-spin origin-center',
             stalled ? 'text-amber-400' : 'text-neutral-900 transition-all duration-500',
           )}
-          strokeDasharray={indeterminate ? `${CIRCUMFERENCE * 0.25} ${CIRCUMFERENCE * 0.75}` : `${CIRCUMFERENCE}`}
+          strokeDasharray={
+            indeterminate ? `${CIRCUMFERENCE * 0.25} ${CIRCUMFERENCE * 0.75}` : `${CIRCUMFERENCE}`
+          }
           strokeDashoffset={indeterminate ? 0 : `${CIRCUMFERENCE * (1 - pct / 100)}`}
           strokeLinecap="round"
         />
       </svg>
-      {label !== undefined && (
-        <span className="text-xs font-semibold tabular-nums">{label}</span>
-      )}
+      {label !== undefined && <span className="text-xs font-semibold tabular-nums">{label}</span>}
     </div>
   )
 }
@@ -73,22 +109,36 @@ function PhaseSteps({ phase }: { phase: DocsPhase }) {
         return (
           <div key={step.key} className="flex items-center">
             <div className="flex flex-col items-center gap-1">
-              <div className={cn(
-                'h-2 w-2 rounded-full transition-colors',
-                isDone ? 'bg-neutral-900' : isActive ? 'bg-neutral-900 animate-pulse' : 'bg-neutral-200',
-              )} />
-              <span className={cn(
-                'text-xs whitespace-nowrap',
-                isDone ? 'text-neutral-500' : isActive ? 'text-neutral-900 font-medium' : 'text-neutral-300',
-              )}>
+              <div
+                className={cn(
+                  'h-2 w-2 rounded-full transition-colors',
+                  isDone
+                    ? 'bg-neutral-900'
+                    : isActive
+                      ? 'bg-neutral-900 animate-pulse'
+                      : 'bg-neutral-200',
+                )}
+              />
+              <span
+                className={cn(
+                  'text-xs whitespace-nowrap',
+                  isDone
+                    ? 'text-neutral-500'
+                    : isActive
+                      ? 'text-neutral-900 font-medium'
+                      : 'text-neutral-300',
+                )}
+              >
                 {step.label}
               </span>
             </div>
             {i < steps.length - 1 && (
-              <div className={cn(
-                'h-px w-8 mb-3 mx-1 transition-colors',
-                isDone ? 'bg-neutral-400' : 'bg-neutral-200',
-              )} />
+              <div
+                className={cn(
+                  'h-px w-8 mb-3 mx-1 transition-colors',
+                  isDone ? 'bg-neutral-400' : 'bg-neutral-200',
+                )}
+              />
             )}
           </div>
         )
@@ -97,13 +147,26 @@ function PhaseSteps({ phase }: { phase: DocsPhase }) {
   )
 }
 
-export function DocsTab({ repositoryId, status: initialStatus, jobId, queue = 'repository-analysis' }: Props) {
+export function DocsTab({
+  repositoryId,
+  status: initialStatus,
+  jobId,
+  queue = 'repository-analysis',
+  indexingFailure,
+}: Props) {
   const t = useTranslations('repositoryDetail.docs')
-  const isDocsFollowUpJob = initialStatus === 'done'
-    && Boolean(jobId)
-    && (queue === 'wiki-generation' || queue === 'mind-map')
-  const { progress, status: jobStatus, error: jobError } = useJobProgress(
-    (initialStatus === 'processing' || initialStatus === 'pending' || isDocsFollowUpJob) ? jobId : null,
+  const isDocsFollowUpJob =
+    initialStatus === 'done' &&
+    Boolean(jobId) &&
+    (queue === 'wiki-generation' || queue === 'mind-map')
+  const {
+    progress,
+    status: jobStatus,
+    error: jobError,
+  } = useJobProgress(
+    initialStatus === 'processing' || initialStatus === 'pending' || isDocsFollowUpJob
+      ? jobId
+      : null,
     queue,
   )
 
@@ -139,7 +202,8 @@ export function DocsTab({ repositoryId, status: initialStatus, jobId, queue = 'r
     if (!shouldPoll) return
 
     function poll() {
-      wikiApi.getPages(repositoryId)
+      wikiApi
+        .getPages(repositoryId)
         .then((data) => setWikiSections(data.sections))
         .catch(() => undefined)
     }
@@ -153,7 +217,8 @@ export function DocsTab({ repositoryId, status: initialStatus, jobId, queue = 'r
   // Fetch document list when fully done
   useEffect(() => {
     if (initialStatus !== 'done') return
-    documentsApi.list(repositoryId)
+    documentsApi
+      .list(repositoryId)
       .then(({ documents }) => setDocs(documents))
       .catch(() => setDocsError('Failed to load documents'))
   }, [repositoryId, initialStatus])
@@ -163,18 +228,21 @@ export function DocsTab({ repositoryId, status: initialStatus, jobId, queue = 'r
     if (!selectedPath) return
     setLoadingDoc(true)
     setSelectedDoc(null)
-    documentsApi.getContent(repositoryId, selectedPath)
+    documentsApi
+      .getContent(repositoryId, selectedPath)
       .then(({ document }) => setSelectedDoc(document))
       .catch(() => setSelectedDoc(null))
       .finally(() => setLoadingDoc(false))
   }, [repositoryId, selectedPath])
 
   if (phase === 'failed') {
+    const failureMessage = jobError ?? indexingFailure?.message
+
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <p className="text-sm font-semibold text-red-600">{t('indexingFailed')}</p>
-        {jobError && (
-          <p className="mt-1 max-w-sm text-xs text-neutral-500">{jobError}</p>
+        {failureMessage && (
+          <p className="mt-1 max-w-md text-sm text-neutral-700">{failureMessage}</p>
         )}
         <p className="mt-2 text-sm text-neutral-500">{t('indexingFailedDescription')}</p>
       </div>
@@ -237,15 +305,18 @@ export function DocsTab({ repositoryId, status: initialStatus, jobId, queue = 'r
             description: t('wikiRegenerationCompleteDescription'),
           }
         : {
-            tone: jobStatus === 'stalled'
-              ? 'border-amber-200 bg-amber-50 text-amber-900'
-              : 'border-blue-200 bg-blue-50 text-blue-900',
-            title: jobStatus === 'stalled'
-              ? t('wikiRegenerationStalled')
-              : t('wikiRegenerationInProgress'),
-            description: jobStatus === 'stalled'
-              ? t('wikiRegenerationStalledDescription')
-              : t('wikiRegenerationProgress', { progress }),
+            tone:
+              jobStatus === 'stalled'
+                ? 'border-amber-200 bg-amber-50 text-amber-900'
+                : 'border-blue-200 bg-blue-50 text-blue-900',
+            title:
+              jobStatus === 'stalled'
+                ? t('wikiRegenerationStalled')
+                : t('wikiRegenerationInProgress'),
+            description:
+              jobStatus === 'stalled'
+                ? t('wikiRegenerationStalledDescription')
+                : t('wikiRegenerationProgress', { progress }),
           }
     : null
   const selectedDocLanguage = selectedDoc
@@ -291,7 +362,12 @@ export function DocsTab({ repositoryId, status: initialStatus, jobId, queue = 'r
       <div className="file-structure-center-column flex h-full min-h-0 min-w-0 justify-center overflow-hidden px-5 py-4">
         <div className="flex h-full min-h-0 w-full max-w-[64rem] flex-col gap-3 overflow-hidden">
           {wikiBanner && (
-            <div className={cn('shrink-0 rounded-[var(--convergekit-radius-lg)] border px-4 py-3', wikiBanner.tone)}>
+            <div
+              className={cn(
+                'shrink-0 rounded-[var(--convergekit-radius-lg)] border px-4 py-3',
+                wikiBanner.tone,
+              )}
+            >
               <p className="text-sm font-semibold">{wikiBanner.title}</p>
               <p className="mt-1 text-sm opacity-90">{wikiBanner.description}</p>
             </div>
@@ -318,7 +394,9 @@ export function DocsTab({ repositoryId, status: initialStatus, jobId, queue = 'r
               <div className="flex h-full min-h-0 flex-col">
                 <div className="flex items-center gap-2 border-b border-[var(--convergekit-line-2)] px-4 py-2.5">
                   <FileText className="h-4 w-4 flex-shrink-0 text-[var(--convergekit-ink-4)]" />
-                  <span className="truncate text-sm font-medium text-[var(--convergekit-ink-2)]">{selectedDoc.path}</span>
+                  <span className="truncate text-sm font-medium text-[var(--convergekit-ink-2)]">
+                    {selectedDoc.path}
+                  </span>
                   {selectedDoc.programmingLanguage && (
                     <span className="ml-auto flex-shrink-0 rounded border border-[var(--convergekit-line)] bg-[var(--convergekit-bg-3)] px-2 py-0.5 text-xs text-[var(--convergekit-ink-4)]">
                       {selectedDoc.programmingLanguage}
@@ -333,9 +411,7 @@ export function DocsTab({ repositoryId, status: initialStatus, jobId, queue = 'r
                     showLineNumbers
                   />
                 ) : (
-                  <pre className="document-raw-viewer flex-1 overflow-auto whitespace-pre-wrap break-all p-4 font-mono text-xs leading-relaxed text-[var(--convergekit-ink-2)]">
-                    {selectedDoc.content}
-                  </pre>
+                  <RawCodeFallback code={selectedDoc.content} />
                 )}
               </div>
             ) : (

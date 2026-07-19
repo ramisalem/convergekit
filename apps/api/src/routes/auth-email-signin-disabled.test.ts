@@ -14,7 +14,7 @@ vi.mock('@convergekit/config/workforce-sso', () => ({
   // Simulate the SSO-enabled production posture where email/password sign-in must be refused.
   resolveWorkforceSsoConfig: () => ({
     workforceSsoEnabled: true,
-    providerLabel: 'Workforce SSO',
+    providerLabel: 'ConvergeKit SSO',
     idpSsoUrl: 'https://accounts.google.com/o/saml2/idp?idpid=test',
     idpEntityId: 'https://accounts.google.com/o/saml2?idpid=test',
     idpCertificate: '-----BEGIN CERTIFICATE-----\nMIID\n-----END CERTIFICATE-----',
@@ -43,7 +43,7 @@ describe('email/password sign-in deprecation when workforce SSO is enabled', () 
 
     expect(res.status).toBe(403)
     await expect(res.json()).resolves.toEqual({
-      error: 'Email/password sign-in is disabled. Please use Workforce SSO.',
+      error: 'Email/password sign-in is disabled. Please use ConvergeKit SSO.',
       code: 'EMAIL_SIGN_IN_DISABLED',
     })
     expect(mocks.authHandler).not.toHaveBeenCalled()
@@ -66,7 +66,7 @@ describe('email/password sign-in deprecation when workforce SSO is enabled', () 
     expect(res.status).toBe(200)
     await expect(res.json()).resolves.toEqual({
       workforceSsoEnabled: true,
-      workforceSsoProviderLabel: 'Workforce SSO',
+      workforceSsoProviderLabel: 'ConvergeKit SSO',
     })
     expect(mocks.authHandler).not.toHaveBeenCalled()
   })

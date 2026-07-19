@@ -28,3 +28,4 @@ export interface MindMapJob {
 }
 
 export * from './schemas.js'
+export * from './analytics.js'

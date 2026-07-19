@@ -4,10 +4,13 @@ import {
   mcpTokenAuditEvents,
   mcpTokens,
   session,
+  user,
   type McpToken,
 } from '@convergekit/db'
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
 import type { Context } from 'hono'
+import type { Executor } from './db-executor.js'
+import { filterMcpScopes } from './mcp-token-policy.js'
 import type { McpScope } from './mcp-token-policy.js'
 import { scopedRepositoryIds } from './scoping.js'
 
@@ -33,9 +36,7 @@ export function clientIp(c: Context): string {
 }
 
 export function normalizeContextScopes(scopes: string[]): McpScope[] {
-  return scopes.filter((scope): scope is McpScope =>
-    ['repo:read', 'docs:search', 'files:read'].includes(scope),
-  )
+  return filterMcpScopes(scopes)
 }
 
 export async function recordMcpAuditEvent(input: {
@@ -60,6 +61,44 @@ export async function recordMcpAuditEvent(input: {
       tokenLabel: input.token.label,
       tokenFingerprint: input.token.fingerprint,
       clientLabel: input.clientLabel ?? null,
+      clientName: input.clientName ?? null,
+      ipAddress: input.ipAddress ?? null,
+      userAgent: input.userAgent ?? null,
+      method: input.method,
+      toolName: input.toolName ?? null,
+      latencyMs: input.latencyMs,
+      status: input.status,
+      statusCode: input.statusCode ?? null,
+      errorCode: input.errorCode ?? null,
+    })
+    .catch(() => undefined)
+}
+
+export async function recordOAuthMcpAuditEvent(input: {
+  oauthTokenId: string
+  userId: string
+  clientId: string
+  clientName?: string | null
+  repositoryId?: string | null
+  ipAddress?: string | null
+  userAgent?: string | null
+  method: string
+  toolName?: string | null
+  latencyMs: number
+  status: McpAuditStatus
+  statusCode?: number | null
+  errorCode?: string | null
+}) {
+  await db
+    .insert(mcpTokenAuditEvents)
+    .values({
+      principalKind: 'oauth',
+      oauthTokenId: input.oauthTokenId,
+      clientId: input.clientId,
+      repositoryId: input.repositoryId ?? null,
+      userId: input.userId,
+      tokenLabel: input.clientName ?? input.clientId,
+      tokenFingerprint: null,
       clientName: input.clientName ?? null,
       ipAddress: input.ipAddress ?? null,
       userAgent: input.userAgent ?? null,
@@ -162,8 +201,9 @@ export async function raiseSuspiciousUseAlerts(input: {
 export async function revokeActiveMcpTokensForUser(
   userId: string,
   revokedReason: string,
+  executor: Executor = db,
 ): Promise<number> {
-  const revoked = await db
+  const revoked = await executor
     .update(mcpTokens)
     .set({ revokedAt: new Date(), revokedReason })
     .where(and(eq(mcpTokens.userId, userId), isNull(mcpTokens.revokedAt)))
@@ -174,9 +214,10 @@ export async function revokeActiveMcpTokensForUser(
 export async function revokeActiveMcpTokensForUsers(
   userIds: string[],
   revokedReason: string,
+  executor: Executor = db,
 ): Promise<number> {
   if (userIds.length === 0) return 0
-  const revoked = await db
+  const revoked = await executor
     .update(mcpTokens)
     .set({ revokedAt: new Date(), revokedReason })
     .where(and(inArray(mcpTokens.userId, userIds), isNull(mcpTokens.revokedAt)))
@@ -216,27 +257,50 @@ export async function revokeActiveMcpTokensForUsersAndRepository(
   return revoked.length
 }
 
+// CI tokens (repositoryId null) are owned by a user and act user-level: they are
+// revoked only when the owner's ciTokensEnabled capability flag is turned off.
+// Legacy repo-scoped rows keep the original allowed-repository check.
+export function shouldRevokeMcpTokenRow(
+  row: { repositoryId: string | null },
+  context: { allowedRepositoryIds: Set<string>; ownerCiEnabled: boolean },
+): boolean {
+  if (row.repositoryId === null) return !context.ownerCiEnabled
+  return !context.allowedRepositoryIds.has(row.repositoryId)
+}
+
 export async function revokeMcpTokensNoLongerAllowed(
   userIds: string[],
   revokedReason: string,
+  executor: Executor = db,
 ): Promise<number> {
   if (userIds.length === 0) return 0
 
-  const activeTokens = await db
+  const activeTokens = await executor
     .select({ id: mcpTokens.id, userId: mcpTokens.userId, repositoryId: mcpTokens.repositoryId })
     .from(mcpTokens)
     .where(and(inArray(mcpTokens.userId, userIds), isNull(mcpTokens.revokedAt)))
 
+  const owners = await executor
+    .select({ id: user.id, ciTokensEnabled: user.ciTokensEnabled })
+    .from(user)
+    .where(inArray(user.id, userIds))
+  const ownerCiEnabledById = new Map(owners.map((o) => [o.id, o.ciTokensEnabled]))
+
   let revoked = 0
   for (const userId of new Set(activeTokens.map((token) => token.userId))) {
-    const allowed = await scopedRepositoryIds(userId)
+    const allowed = await scopedRepositoryIds(userId, executor)
+    const ownerCiEnabled = ownerCiEnabledById.get(userId) === true
+
     const revokeIds = activeTokens
-      .filter((token) => token.userId === userId && !allowed.has(token.repositoryId))
+      .filter((token) => token.userId === userId)
+      .filter((token) =>
+        shouldRevokeMcpTokenRow(token, { allowedRepositoryIds: allowed, ownerCiEnabled }),
+      )
       .map((token) => token.id)
 
     if (revokeIds.length === 0) continue
 
-    const rows = await db
+    const rows = await executor
       .update(mcpTokens)
       .set({ revokedAt: new Date(), revokedReason })
       .where(inArray(mcpTokens.id, revokeIds))

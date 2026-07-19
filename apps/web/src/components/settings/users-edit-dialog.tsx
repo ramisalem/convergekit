@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { Dialog } from '@/components/ui/dialog'
 import type { Group, ManagedUser } from '@/lib/api-client'
 import { usersApi } from '@/lib/api-client'
+import { useEffect, useState } from 'react'
 
 export function UsersEditDialog({
   open,
@@ -23,6 +23,7 @@ export function UsersEditDialog({
   const [name, setName] = useState('')
   const [role, setRole] = useState<'admin' | 'user'>('user')
   const [groupId, setGroupId] = useState('')
+  const [ciTokensEnabled, setCiTokensEnabled] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -31,6 +32,7 @@ export function UsersEditDialog({
       setName(user.name)
       setRole(user.role)
       setGroupId(user.groupId ?? '')
+      setCiTokensEnabled(user.ciTokensEnabled)
       setError(null)
     }
   }, [user])
@@ -40,6 +42,18 @@ export function UsersEditDialog({
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!user) return
+    // Disabling the capability revokes the user's active user-level tokens in
+    // the same transaction — confirm before applying ANY of the edits, so a
+    // decline never half-applies the form.
+    const disablingCiTokens = user.ciTokensEnabled && !ciTokensEnabled
+    if (
+      disablingCiTokens &&
+      !confirm(
+        `Disable user-level CI tokens for ${user.name}? Their active user-level tokens will be revoked immediately.`,
+      )
+    ) {
+      return
+    }
     setError(null)
     setSubmitting(true)
     try {
@@ -47,6 +61,7 @@ export function UsersEditDialog({
         name,
         role,
         groupId: groupId === '' ? null : groupId,
+        ciTokensEnabled,
       })
       onSaved()
       onClose()
@@ -108,6 +123,27 @@ export function UsersEditDialog({
               </option>
             ))}
           </select>
+        </div>
+        <div>
+          <label
+            htmlFor="edit-ci-tokens-enabled"
+            className="flex items-center justify-between gap-3 text-sm font-medium"
+          >
+            <span>User-level CI tokens</span>
+            <input
+              id="edit-ci-tokens-enabled"
+              type="checkbox"
+              checked={ciTokensEnabled}
+              onChange={(e) => setCiTokensEnabled(e.target.checked)}
+              disabled={submitting}
+              className="h-4 w-4 rounded border-neutral-300"
+            />
+          </label>
+          <p className="mt-1 text-xs text-neutral-500">
+            Lets this person create and manage their own CI / automation tokens. Disabling it
+            immediately revokes their user-level CI tokens — it does not affect grandfathered
+            per-repo tokens or connected OAuth agents.
+          </p>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex items-center justify-end gap-2 pt-2">

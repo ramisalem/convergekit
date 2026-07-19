@@ -3,10 +3,11 @@
 import type { AccessPolicySettings } from '@/lib/api-client'
 import { useState, type ReactNode } from 'react'
 import { AccessPolicyPanel } from './access-policy-panel'
+import { CiTokensPanel } from './ci-tokens-panel'
 import { GroupsPanel } from './groups-panel'
 import { UsersPanel } from './users-panel'
 
-type TabId = 'ai' | 'users' | 'groups' | 'access-policy'
+type TabId = 'ai' | 'users' | 'groups' | 'access-policy' | 'ci-tokens'
 
 export function SettingsTabs({
   aiPanel,
@@ -35,6 +36,9 @@ export function SettingsTabs({
           <TabButton id="access-policy" active={tab} onClick={setTab}>
             Access policy
           </TabButton>
+          <TabButton id="ci-tokens" active={tab} onClick={setTab}>
+            CI token oversight
+          </TabButton>
         </nav>
       </div>
 
@@ -42,6 +46,7 @@ export function SettingsTabs({
       {tab === 'users' && <UsersPanel currentUserId={currentUserId} />}
       {tab === 'groups' && <GroupsPanel />}
       {tab === 'access-policy' && <AccessPolicyPanel policy={accessPolicy} />}
+      {tab === 'ci-tokens' && <CiTokensPanel />}
     </div>
   )
 }

@@ -6,9 +6,8 @@ const fileTreeSource = readFileSync(new URL('./document-file-tree.tsx', import.m
 const messagesSource = readFileSync(new URL('../../../messages/en.json', import.meta.url), 'utf8')
 
 describe('document file tree contract', () => {
-  it('renames the documentation tab to File Structure', () => {
-    expect(messagesSource).toContain('"docs": "File Structure"')
-    expect(messagesSource).not.toContain('"docs": "Documentation"')
+  it('keeps the ConvergeKit documentation tab copy while using the file tree design', () => {
+    expect(messagesSource).toContain('"docs": "Documentation"')
   })
 
   it('uses a searchable selectable tree instead of a flat file column', () => {

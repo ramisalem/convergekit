@@ -22,6 +22,7 @@ import { chunkDocument } from '../lib/chunker.js'
 import { cleanupWorkspace, readFileContent, walkRepositoryFiles } from '../lib/fs.js'
 import { summarizeSkippedFiles } from '../lib/indexing-limits.js'
 import { detectLanguage } from '../lib/language.js'
+import { summarizeErrorForLog } from '../lib/logging.js'
 import { logger } from '../logger.js'
 
 const WORKSPACE_DIR = process.env.WORKSPACE_DIR ?? '/tmp/convergekit-workspace'
@@ -34,6 +35,8 @@ async function processRepository(job: Job<RepositoryJobData>): Promise<void> {
   await job.updateProgress(5)
 
   try {
+    await cleanupWorkspace(workDir)
+
     // Stage 1: clone
     logger.info({ repositoryId }, 'Cloning repository')
     const git = simpleGit()
@@ -198,7 +201,7 @@ export function createRepositoryWorker(): Worker<RepositoryJobData> {
 
   worker.on('failed', (job, err) => {
     logger.error(
-      { jobId: job?.id, repositoryId: job?.data.repositoryId, err },
+      { jobId: job?.id, repositoryId: job?.data.repositoryId, err: summarizeErrorForLog(err) },
       'Repository job failed',
     )
     if (job?.data.repositoryId) {

@@ -7,7 +7,13 @@ import { getApiBaseUrl, getWebBaseUrl } from '@/lib/runtime-urls'
 const API_URL = getApiBaseUrl()
 const WEB_URL = getWebBaseUrl()
 
-export function GitHubSignInButton({ label }: { label: string }) {
+export function GitHubSignInButton({
+  label,
+  redirectTo,
+}: {
+  label: string
+  redirectTo?: string | null
+}) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -21,7 +27,7 @@ export function GitHubSignInButton({ label }: { label: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider: 'github',
-          callbackURL: `${WEB_URL}/en/repositories`,
+          callbackURL: redirectTo ?? `${WEB_URL}/en/repositories`,
         }),
       })
       const data = await res.json()

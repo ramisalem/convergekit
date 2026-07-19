@@ -1,51 +1,176 @@
-import { describe, expect, it } from 'vitest'
-import { buildRepositoryListSummaryMap } from './repository-list-summary.js'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  attachRepositoryListSummaries,
+  buildRepositoryListSummaries,
+  type RepositoryListSummary,
+} from './repository-list-summary.js'
 
-describe('buildRepositoryListSummaryMap', () => {
-  it('summarizes indexed state, dominant language, LOC, and user chat counts by repository', () => {
-    const summaries = buildRepositoryListSummaryMap({
-      repositoryIds: ['repo-a', 'repo-b'],
-      documentStats: [
-        { repositoryId: 'repo-a', programmingLanguage: 'typescript', fileCount: 3, loc: 1200 },
-        { repositoryId: 'repo-a', programmingLanguage: 'markdown', fileCount: 1, loc: 40 },
-        { repositoryId: 'repo-b', programmingLanguage: null, fileCount: 2, loc: 0 },
-      ],
-      branchStats: [
-        { repositoryId: 'repo-a', indexedAt: new Date('2026-05-18T10:00:00.000Z') },
-        { repositoryId: 'repo-a', indexedAt: new Date('2026-05-19T10:00:00.000Z') },
-        { repositoryId: 'repo-b', indexedAt: null },
-      ],
-      chatCounts: [
-        { repositoryId: 'repo-a', chatCount: 4 },
-      ],
-    })
+const noRows = {
+  branchRows: [],
+  documentRows: [],
+  languageRows: [],
+  chatRows: [],
+}
 
-    expect(summaries.get('repo-a')).toEqual({
-      primaryLanguage: 'typescript',
-      loc: 1240,
-      chatCount: 4,
-      indexedAt: '2026-05-19T10:00:00.000Z',
-    })
-    expect(summaries.get('repo-b')).toEqual({
-      primaryLanguage: null,
-      loc: 0,
+vi.mock('@convergekit/db', () => ({
+  branches: {},
+  chatSessions: {},
+  db: {},
+  documents: {},
+}))
+
+const baseRepository = {
+  id: '8c8e7c75-9a8d-4ef2-877b-5fb8a68ab741',
+  name: 'example-backend',
+  cloneUrl: 'https://github.com/example-org/example-backend.git',
+  provider: 'github' as const,
+  defaultBranch: 'main',
+  isPrivate: true,
+  status: 'done' as const,
+  userId: 'user-1',
+  createdAt: new Date('2026-04-26T00:00:00.000Z'),
+  updatedAt: new Date('2026-04-26T00:00:00.000Z'),
+  deletedAt: null,
+}
+
+describe('attachRepositoryListSummaries', () => {
+  it('adds list metrics to matching repositories', () => {
+    const summary: RepositoryListSummary = {
+      chatCount: 47,
+      indexedAt: '2026-06-01T10:00:00.000Z',
+      loc: 1_225_487,
+      primaryLanguage: 'Ruby',
+    }
+
+    const repositories = attachRepositoryListSummaries(
+      [baseRepository],
+      new Map([[baseRepository.id, summary]]),
+    )
+
+    expect(repositories[0]).toMatchObject({ listSummary: summary })
+  })
+
+  it('uses an explicit empty summary when a repository has no aggregate rows', () => {
+    const repositories = attachRepositoryListSummaries([baseRepository], new Map())
+
+    expect(repositories[0]?.listSummary).toEqual({
       chatCount: 0,
       indexedAt: null,
+      loc: 0,
+      primaryLanguage: null,
+    })
+  })
+})
+
+describe('buildRepositoryListSummaries', () => {
+  const repoA = 'a0000000-0000-4000-8000-000000000001'
+  const repoB = 'b0000000-0000-4000-8000-000000000002'
+
+  it('initializes a deduplicated empty summary for every requested repository', () => {
+    const summaries = buildRepositoryListSummaries([repoA, repoA, repoB], noRows)
+
+    expect([...summaries.keys()]).toEqual([repoA, repoB])
+    expect(summaries.get(repoA)).toEqual({
+      chatCount: 0,
+      indexedAt: null,
+      loc: 0,
+      primaryLanguage: null,
     })
   })
 
-  it('breaks dominant-language ties by LOC and then language name', () => {
-    const summaries = buildRepositoryListSummaryMap({
-      repositoryIds: ['repo-a'],
-      documentStats: [
-        { repositoryId: 'repo-a', programmingLanguage: 'typescript', fileCount: 2, loc: 100 },
-        { repositoryId: 'repo-a', programmingLanguage: 'python', fileCount: 2, loc: 220 },
-        { repositoryId: 'repo-a', programmingLanguage: 'ruby', fileCount: 2, loc: 220 },
-      ],
-      branchStats: [],
-      chatCounts: [],
+  it('returns an empty map when no repository ids are requested', () => {
+    expect(buildRepositoryListSummaries([], noRows).size).toBe(0)
+  })
+
+  it('merges branch, document, language, and chat metrics for a repository', () => {
+    const summaries = buildRepositoryListSummaries([repoA], {
+      branchRows: [{ repositoryId: repoA, indexedAt: new Date('2026-06-01T10:00:00.000Z') }],
+      documentRows: [{ repositoryId: repoA, loc: 1_225_487 }],
+      languageRows: [{ repositoryId: repoA, primaryLanguage: 'Ruby', documentCount: 12 }],
+      chatRows: [{ repositoryId: repoA, chatCount: 47 }],
     })
 
-    expect(summaries.get('repo-a')?.primaryLanguage).toBe('python')
+    expect(summaries.get(repoA)).toEqual({
+      chatCount: 47,
+      indexedAt: '2026-06-01T10:00:00.000Z',
+      loc: 1_225_487,
+      primaryLanguage: 'Ruby',
+    })
+  })
+
+  it('parses numeric counts that arrive as strings and treats null loc as zero', () => {
+    const summaries = buildRepositoryListSummaries([repoA], {
+      ...noRows,
+      documentRows: [{ repositoryId: repoA, loc: null }],
+      chatRows: [{ repositoryId: repoA, chatCount: '47' }],
+    })
+
+    expect(summaries.get(repoA)?.loc).toBe(0)
+    expect(summaries.get(repoA)?.chatCount).toBe(47)
+  })
+
+  it('converts string branch timestamps to ISO and leaves null timestamps null', () => {
+    const withString = buildRepositoryListSummaries([repoA], {
+      ...noRows,
+      branchRows: [{ repositoryId: repoA, indexedAt: '2026-06-01T10:00:00.000Z' }],
+    })
+    const withNull = buildRepositoryListSummaries([repoB], {
+      ...noRows,
+      branchRows: [{ repositoryId: repoB, indexedAt: null }],
+    })
+
+    expect(withString.get(repoA)?.indexedAt).toBe('2026-06-01T10:00:00.000Z')
+    expect(withNull.get(repoB)?.indexedAt).toBeNull()
+  })
+
+  it('picks the language with the most documents, breaking ties lexicographically', () => {
+    const summaries = buildRepositoryListSummaries([repoA], {
+      ...noRows,
+      languageRows: [
+        { repositoryId: repoA, primaryLanguage: 'Ruby', documentCount: 10 },
+        { repositoryId: repoA, primaryLanguage: 'Go', documentCount: 10 },
+        { repositoryId: repoA, primaryLanguage: 'TypeScript', documentCount: 3 },
+      ],
+    })
+
+    expect(summaries.get(repoA)?.primaryLanguage).toBe('Go')
+  })
+
+  it('lets a strictly higher document count win over a lexicographically smaller language', () => {
+    const summaries = buildRepositoryListSummaries([repoA], {
+      ...noRows,
+      languageRows: [
+        { repositoryId: repoA, primaryLanguage: 'Go', documentCount: 5 },
+        { repositoryId: repoA, primaryLanguage: 'Python', documentCount: 20 },
+      ],
+    })
+
+    expect(summaries.get(repoA)?.primaryLanguage).toBe('Python')
+  })
+
+  it('ignores language rows with a null language', () => {
+    const summaries = buildRepositoryListSummaries([repoA], {
+      ...noRows,
+      languageRows: [{ repositoryId: repoA, primaryLanguage: null, documentCount: 99 }],
+    })
+
+    expect(summaries.get(repoA)?.primaryLanguage).toBeNull()
+  })
+
+  it('ignores aggregate rows for repositories that were not requested', () => {
+    const summaries = buildRepositoryListSummaries([repoA], {
+      branchRows: [{ repositoryId: repoB, indexedAt: new Date('2026-06-01T10:00:00.000Z') }],
+      documentRows: [{ repositoryId: repoB, loc: 999 }],
+      languageRows: [{ repositoryId: repoB, primaryLanguage: 'Go', documentCount: 9 }],
+      chatRows: [{ repositoryId: repoB, chatCount: 9 }],
+    })
+
+    expect(summaries.has(repoB)).toBe(false)
+    expect(summaries.get(repoA)).toEqual({
+      chatCount: 0,
+      indexedAt: null,
+      loc: 0,
+      primaryLanguage: null,
+    })
   })
 })

@@ -10,10 +10,10 @@ const accessPolicy: AccessPolicyConfig = {
 }
 
 describe('resolveWorkforceSsoConfig', () => {
-  it('defaults workforce SSO to disabled with Workforce SSO label and 14-day sessions', () => {
+  it('defaults workforce SSO to disabled with ConvergeKit SSO label and 14-day sessions', () => {
     expect(resolveWorkforceSsoConfig({}, accessPolicy)).toMatchObject({
       workforceSsoEnabled: false,
-      providerLabel: 'Workforce SSO',
+      providerLabel: 'ConvergeKit SSO',
       sessionTtlDays: 14,
       supportAdminEmails: [],
     })
@@ -42,13 +42,13 @@ describe('resolveWorkforceSsoConfig', () => {
       resolveWorkforceSsoConfig(
         {
           WORKFORCE_SSO_ENABLED: 'true',
-          WORKFORCE_SSO_PROVIDER_LABEL: 'Example Workspace',
+          WORKFORCE_SSO_PROVIDER_LABEL: 'ConvergeKit Workspace',
           WORKFORCE_SAML_IDP_SSO_URL: 'https://accounts.google.com/o/saml2/idp?idpid=test',
           WORKFORCE_SAML_IDP_ENTITY_ID: 'https://accounts.google.com/o/saml2?idpid=test',
           WORKFORCE_SAML_IDP_CERT: '-----BEGIN CERTIFICATE-----\nMIID\n-----END CERTIFICATE-----',
           WORKFORCE_SAML_SP_ENTITY_ID: 'urn:convergekit:dev',
-          WORKFORCE_SAML_ACS_URL: 'https://convergekit-dev.local/api/auth/workforce-saml/acs',
-          WORKFORCE_SAML_START_URL: 'https://convergekit-dev.local/en/auth/sign-in',
+          WORKFORCE_SAML_ACS_URL: 'http://localhost:4001/api/auth/workforce-saml/acs',
+          WORKFORCE_SAML_START_URL: 'http://localhost:4000/en/auth/sign-in',
           CONVERGEKIT_SESSION_TTL_DAYS: '14',
           ACCESS_SUPPORT_ADMIN_EMAILS: 'Admin@Example.Com, support@example.com',
         },
@@ -56,12 +56,12 @@ describe('resolveWorkforceSsoConfig', () => {
       ),
     ).toMatchObject({
       workforceSsoEnabled: true,
-      providerLabel: 'Example Workspace',
+      providerLabel: 'ConvergeKit Workspace',
       idpSsoUrl: 'https://accounts.google.com/o/saml2/idp?idpid=test',
       idpEntityId: 'https://accounts.google.com/o/saml2?idpid=test',
       spEntityId: 'urn:convergekit:dev',
-      acsUrl: 'https://convergekit-dev.local/api/auth/workforce-saml/acs',
-      startUrl: 'https://convergekit-dev.local/en/auth/sign-in',
+      acsUrl: 'http://localhost:4001/api/auth/workforce-saml/acs',
+      startUrl: 'http://localhost:4000/en/auth/sign-in',
       sessionTtlDays: 14,
       supportAdminEmails: ['admin@example.com', 'support@example.com'],
     })

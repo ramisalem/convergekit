@@ -3,8 +3,7 @@ import './globals.css'
 
 export const metadata = {
   title: { default: 'ConvergeKit', template: '%s | ConvergeKit' },
-  description:
-    'Bring product intent, code reality, and agent context together for software teams.',
+  description: 'The shared source of truth for product, engineering, and AI agents.',
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {

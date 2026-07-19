@@ -26,6 +26,14 @@ https://convergekit-dev.local {
 		reverse_proxy {$CONVERGEKIT_API_UPSTREAM:api:3001}
 	}
 
+	handle /.well-known/oauth-authorization-server {
+		reverse_proxy {$CONVERGEKIT_API_UPSTREAM:api:3001}
+	}
+
+	handle /.well-known/oauth-protected-resource {
+		reverse_proxy {$CONVERGEKIT_API_UPSTREAM:api:3001}
+	}
+
 	handle {
 		reverse_proxy {$CONVERGEKIT_WEB_UPSTREAM:web:3000}
 	}

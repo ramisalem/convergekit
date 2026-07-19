@@ -8,17 +8,23 @@
     "./evidence-alignment": "./src/evidence-alignment.ts",
     "./evidence": "./src/evidence.ts",
     "./schema": "./src/schema.ts",
-    "./client": "./src/client.ts"
+    "./client": "./src/client.ts",
+    "./redact": "./src/redact.ts",
+    "./backfill-ci-token-capability": "./src/backfill-ci-token-capability.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate && tsx src/apply-manual-migrations.ts",
     "db:backfill:evidence": "tsx src/backfill-evidence-metadata.ts",
+    "db:backfill:ci-tokens": "tsx src/backfill-ci-token-capability.ts",
+    "db:deploy": "pnpm db:migrate && pnpm db:backfill:ci-tokens",
     "db:transfer-chat-history": "tsx src/maintenance/transfer-chat-history.ts",
     "db:validate:baseline": "tsx src/validate-migration-baseline.ts",
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

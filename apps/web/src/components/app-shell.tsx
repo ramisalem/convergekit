@@ -1,3 +1,4 @@
+import { AccountNavLinks } from '@/components/account-nav-links'
 import { AdminNavLinks } from '@/components/admin-nav-links'
 import { ConvergeKitLogo } from '@/components/convergekit-logo'
 import { NavLinks } from '@/components/nav-links'
@@ -21,6 +22,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             </a>
             <nav className="flex items-center gap-1">
               <NavLinks items={[{ href: '/repositories', label: t('repositories') }]} />
+              <AccountNavLinks
+                connectedAgentsLabel={t('connectedAgents')}
+                ciTokensLabel={t('ciTokens')}
+              />
               <AdminNavLinks settingsLabel={t('settings')} />
             </nav>
           </div>

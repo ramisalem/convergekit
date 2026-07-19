@@ -1,130 +1,181 @@
-export type RepositoryDocumentStat = {
-  repositoryId: string
-  programmingLanguage: string | null
-  fileCount: number | string
-  loc: number | string | null
-}
-
-export type RepositoryBranchStat = {
-  repositoryId: string
-  indexedAt: Date | string | null
-}
-
-export type RepositoryChatCount = {
-  repositoryId: string
-  chatCount: number | string
-}
+import { branches, chatSessions, db, documents, INTERNAL_DOCUMENT_PATHS } from '@convergekit/db'
+import { and, eq, inArray, notInArray, sql } from 'drizzle-orm'
 
 export type RepositoryListSummary = {
-  primaryLanguage: string | null
-  loc: number | null
   chatCount: number
   indexedAt: string | null
+  loc: number
+  primaryLanguage: string | null
 }
 
-type SummaryAccumulator = RepositoryListSummary & {
-  languageStats: Map<string, { fileCount: number; loc: number }>
-  hasDocumentStats: boolean
+type BranchSummaryRow = {
+  indexedAt: Date | string | null
+  repositoryId: string
 }
 
-function toNumber(value: number | string | null | undefined) {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
-  if (typeof value === 'string') {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : 0
+type DocumentSummaryRow = {
+  loc: number | string | null
+  repositoryId: string
+}
+
+type LanguageSummaryRow = {
+  documentCount: number | string
+  primaryLanguage: string | null
+  repositoryId: string
+}
+
+type ChatSummaryRow = {
+  chatCount: number | string
+  repositoryId: string
+}
+
+function emptySummary(): RepositoryListSummary {
+  return {
+    chatCount: 0,
+    indexedAt: null,
+    loc: 0,
+    primaryLanguage: null,
   }
-  return 0
 }
 
-function toIsoDate(value: Date | string | null) {
+function toCount(value: number | string | null | undefined) {
+  if (value === null || value === undefined) return 0
+  return typeof value === 'number' ? value : Number.parseInt(value, 10)
+}
+
+function toIsoString(value: Date | string | null | undefined) {
   if (!value) return null
-  const date = value instanceof Date ? value : new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString()
 }
 
-function choosePrimaryLanguage(
-  languageStats: SummaryAccumulator['languageStats'],
-) {
-  const [first] = [...languageStats.entries()].sort((a, b) => {
-    const [, aStat] = a
-    const [, bStat] = b
-    if (aStat.fileCount !== bStat.fileCount) return bStat.fileCount - aStat.fileCount
-    if (aStat.loc !== bStat.loc) return bStat.loc - aStat.loc
-    return a[0].localeCompare(b[0], undefined, { sensitivity: 'base' })
-  })
-
-  return first?.[0] ?? null
+export function attachRepositoryListSummaries<T extends { id: string }>(
+  repositories: T[],
+  summaries: ReadonlyMap<string, RepositoryListSummary>,
+): Array<T & { listSummary: RepositoryListSummary }> {
+  return repositories.map((repository) => ({
+    ...repository,
+    listSummary: summaries.get(repository.id) ?? emptySummary(),
+  }))
 }
 
-export function buildRepositoryListSummaryMap({
-  repositoryIds,
-  documentStats,
-  branchStats,
-  chatCounts,
-}: {
-  repositoryIds: string[]
-  documentStats: RepositoryDocumentStat[]
-  branchStats: RepositoryBranchStat[]
-  chatCounts: RepositoryChatCount[]
-}) {
-  const summaries = new Map<string, SummaryAccumulator>()
+type RepositoryListSummaryRows = {
+  branchRows: BranchSummaryRow[]
+  documentRows: DocumentSummaryRow[]
+  languageRows: LanguageSummaryRow[]
+  chatRows: ChatSummaryRow[]
+}
 
-  for (const repositoryId of repositoryIds) {
-    summaries.set(repositoryId, {
-      primaryLanguage: null,
-      loc: null,
-      chatCount: 0,
-      indexedAt: null,
-      languageStats: new Map(),
-      hasDocumentStats: false,
-    })
+/**
+ * Pure reducer: fold the four aggregate row sets into one summary per requested
+ * repository. Kept separate from the database access so the (branch-heavy)
+ * merge and language tie-break logic is unit-testable without a live database.
+ */
+export function buildRepositoryListSummaries(
+  repositoryIds: string[],
+  rows: RepositoryListSummaryRows,
+): Map<string, RepositoryListSummary> {
+  const summaries = new Map<string, RepositoryListSummary>(
+    [...new Set(repositoryIds)].map((repositoryId) => [repositoryId, emptySummary()]),
+  )
+
+  for (const row of rows.branchRows) {
+    const summary = summaries.get(row.repositoryId)
+    if (summary) summary.indexedAt = toIsoString(row.indexedAt)
   }
 
-  for (const stat of documentStats) {
-    const summary = summaries.get(stat.repositoryId)
-    if (!summary) continue
-
-    const loc = toNumber(stat.loc)
-    const fileCount = toNumber(stat.fileCount)
-    summary.hasDocumentStats = true
-    summary.loc = (summary.loc ?? 0) + loc
-
-    const language = stat.programmingLanguage?.trim()
-    if (!language) continue
-
-    const current = summary.languageStats.get(language) ?? { fileCount: 0, loc: 0 }
-    current.fileCount += fileCount
-    current.loc += loc
-    summary.languageStats.set(language, current)
+  for (const row of rows.documentRows) {
+    const summary = summaries.get(row.repositoryId)
+    if (summary) summary.loc = toCount(row.loc)
   }
 
-  for (const stat of branchStats) {
-    const summary = summaries.get(stat.repositoryId)
-    if (!summary) continue
-
-    const indexedAt = toIsoDate(stat.indexedAt)
-    if (!indexedAt) continue
-
-    if (!summary.indexedAt || indexedAt > summary.indexedAt) {
-      summary.indexedAt = indexedAt
+  const primaryLanguageByRepository = new Map<string, { count: number; language: string }>()
+  for (const row of rows.languageRows) {
+    if (!row.primaryLanguage) continue
+    const count = toCount(row.documentCount)
+    const current = primaryLanguageByRepository.get(row.repositoryId)
+    if (
+      !current ||
+      count > current.count ||
+      (count === current.count && row.primaryLanguage < current.language)
+    ) {
+      primaryLanguageByRepository.set(row.repositoryId, {
+        count,
+        language: row.primaryLanguage,
+      })
     }
   }
-
-  for (const stat of chatCounts) {
-    const summary = summaries.get(stat.repositoryId)
-    if (!summary) continue
-    summary.chatCount = toNumber(stat.chatCount)
+  for (const [repositoryId, value] of primaryLanguageByRepository) {
+    const summary = summaries.get(repositoryId)
+    if (summary) summary.primaryLanguage = value.language
   }
 
-  return new Map(
-    [...summaries.entries()].map(([repositoryId, summary]) => [
-      repositoryId,
-      {
-        primaryLanguage: choosePrimaryLanguage(summary.languageStats),
-        loc: summary.hasDocumentStats ? summary.loc ?? 0 : null,
-        chatCount: summary.chatCount,
-        indexedAt: summary.indexedAt,
-      } satisfies RepositoryListSummary,
-    ]),
-  )
+  for (const row of rows.chatRows) {
+    const summary = summaries.get(row.repositoryId)
+    if (summary) summary.chatCount = toCount(row.chatCount)
+  }
+
+  return summaries
+}
+
+export async function getRepositoryListSummaries(
+  repositoryIds: string[],
+): Promise<Map<string, RepositoryListSummary>> {
+  const uniqueRepositoryIds = [...new Set(repositoryIds)]
+  if (uniqueRepositoryIds.length === 0) return new Map()
+
+  const [branchRows, documentRows, languageRows, chatRows] = await Promise.all([
+    db
+      .select({
+        repositoryId: branches.repositoryId,
+        indexedAt: sql<Date | null>`max(${branches.lastIndexedAt})`,
+      })
+      .from(branches)
+      .where(inArray(branches.repositoryId, uniqueRepositoryIds))
+      .groupBy(branches.repositoryId),
+    db
+      .select({
+        repositoryId: branches.repositoryId,
+        loc: sql<number>`coalesce(sum(${documents.lineCount}), 0)::int`,
+      })
+      .from(documents)
+      .innerJoin(branches, eq(documents.branchId, branches.id))
+      .where(
+        and(
+          inArray(branches.repositoryId, uniqueRepositoryIds),
+          notInArray(documents.path, INTERNAL_DOCUMENT_PATHS),
+        ),
+      )
+      .groupBy(branches.repositoryId),
+    db
+      .select({
+        repositoryId: branches.repositoryId,
+        primaryLanguage: documents.programmingLanguage,
+        documentCount: sql<number>`count(*)::int`,
+      })
+      .from(documents)
+      .innerJoin(branches, eq(documents.branchId, branches.id))
+      .where(
+        and(
+          inArray(branches.repositoryId, uniqueRepositoryIds),
+          notInArray(documents.path, INTERNAL_DOCUMENT_PATHS),
+          sql`${documents.programmingLanguage} is not null`,
+        ),
+      )
+      .groupBy(branches.repositoryId, documents.programmingLanguage),
+    db
+      .select({
+        repositoryId: chatSessions.repositoryId,
+        chatCount: sql<number>`count(*)::int`,
+      })
+      .from(chatSessions)
+      .where(inArray(chatSessions.repositoryId, uniqueRepositoryIds))
+      .groupBy(chatSessions.repositoryId),
+  ])
+
+  return buildRepositoryListSummaries(uniqueRepositoryIds, {
+    branchRows: branchRows as BranchSummaryRow[],
+    documentRows: documentRows as DocumentSummaryRow[],
+    languageRows: languageRows as LanguageSummaryRow[],
+    chatRows: chatRows as ChatSummaryRow[],
+  })
 }

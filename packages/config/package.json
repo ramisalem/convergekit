@@ -7,10 +7,12 @@
     ".": "./src/index.ts",
     "./env": "./src/env.ts",
     "./access-policy": "./src/access-policy.ts",
-    "./workforce-sso": "./src/workforce-sso.ts"
+    "./workforce-sso": "./src/workforce-sso.ts",
+    "./mcp-oauth": "./src/mcp-oauth.ts"
   },
   "scripts": {
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },

@@ -18,6 +18,17 @@ describe('searchDocsTool', () => {
     vi.clearAllMocks()
   })
 
+  it('accepts contextual search queries from MCP-style clients', () => {
+    const toolDef = searchDocsTool('repo-1') as unknown as {
+      inputSchema: { safeParse(input: unknown): { success: boolean } }
+    }
+
+    const query = 'Explain these insurance policy serializers and migration. '.repeat(20)
+
+    expect(query.length).toBeGreaterThan(500)
+    expect(toolDef.inputSchema.safeParse({ query, limit: 5 }).success).toBe(true)
+  })
+
   it('returns evidence metadata from the executed search tool', async () => {
     mockedSearchChunks.mockResolvedValue([
       {

@@ -12,10 +12,12 @@
  *                      notifications on an existing session.
  *   DELETE /api/mcp  — closes an existing session.
  *
- * All three methods are protected by `requireMcpToken`, which scopes the
- * caller to a single repository (`mcpRepositoryId`). Sessions are bound to
- * that repository at creation so a token issued for repo A cannot reuse a
- * session id created under repo B.
+ * All three methods are protected by `requireMcpCredential`, which resolves a
+ * normalized `mcpPrincipal` — either a `static` CI token (user-level, or a
+ * grandfathered per-repo token served repo-implied) or an `oauth` user-scoped
+ * grant. Sessions are keyed by a derived `principalKey`
+ * (`static:<tokenId>` or `oauth:<userId>`) so a credential for one principal
+ * cannot reuse a session id created under another.
  *
  * Uses the Web-Standard transport variant (Request/Response), which fits
  * Hono's `c.req.raw` / returned-Response model cleanly and avoids the raw
@@ -23,38 +25,62 @@
  */
 
 import { getAiSettingsForRepo } from '@convergekit/db'
-import { createMcpServer } from '@convergekit/mcp'
+import { createMcpServer, createUserScopedMcpServer } from '@convergekit/mcp'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import { randomUUID } from 'node:crypto'
+import { logger } from '../logger.js'
 import {
   getEmbeddingOptionsForProfile,
   getRepositoryEmbeddingState,
 } from '../lib/embedding-compatibility.js'
+import { buildUserServerDeps } from '../lib/mcp-oauth-tools.js'
+import { touchOAuthGrantUsage } from '../lib/mcp-oauth-store.js'
+import {
+  createMcpSessionLifecycleHandlers,
+  McpSessionStore,
+  parseMcpSessionStoreConfig,
+  type McpSessionRecord,
+} from '../lib/mcp-session-store.js'
 import { mcpToolsForScopes } from '../lib/mcp-token-policy.js'
 import {
   clientIp,
   normalizeContextScopes,
   raiseSuspiciousUseAlerts,
   recordMcpAuditEvent,
+  recordOAuthMcpAuditEvent,
   touchMcpTokenUsage,
+  type McpAuditStatus,
 } from '../lib/mcp-token-security.js'
+import type { McpPrincipal } from '../middleware/require-mcp-credential.js'
 
 export const mcpRoutes = new Hono()
 
-type Session = {
-  transport: WebStandardStreamableHTTPServerTransport
-  repositoryId: string
+const sessionConfig = parseMcpSessionStoreConfig(process.env)
+const sessions = new McpSessionStore<WebStandardStreamableHTTPServerTransport>(sessionConfig)
+
+async function closeMcpSessions(records: McpSessionRecord<WebStandardStreamableHTTPServerTransport>[], reason: string) {
+  if (records.length === 0) return
+  const log = reason === 'expired' ? logger.info.bind(logger) : logger.warn.bind(logger)
+  log({ count: records.length, reason }, 'Closing MCP sessions')
+  await Promise.allSettled(records.map((record) => record.transport.close()))
 }
 
-const sessions = new Map<string, Session>()
+const sessionSweepTimer = setInterval(() => {
+  const expired = sessions.sweepExpired()
+  void closeMcpSessions(expired, 'expired')
+}, sessionConfig.sweepIntervalMs)
+sessionSweepTimer.unref?.()
 
 type JsonRpcLike = {
   method?: unknown
   params?: {
     name?: unknown
+    arguments?: {
+      repository?: unknown
+    }
     clientInfo?: {
       name?: unknown
     }
@@ -70,7 +96,65 @@ function mcpRequestMetadata(body: unknown, fallbackMethod: string) {
     method === 'initialize' && typeof rpc?.params?.clientInfo?.name === 'string'
       ? rpc.params.clientInfo.name
       : null
-  return { method, toolName, clientName }
+  // Best-effort: the tool call's `repository` argument is a ref (id OR name).
+  const repositoryArg =
+    typeof rpc?.params?.arguments?.repository === 'string' ? rpc.params.arguments.repository : null
+  return { method, toolName, clientName, repositoryArg }
+}
+
+type AuditFields = {
+  latencyMs: number
+  status: McpAuditStatus
+  statusCode: number | null
+  errorCode: string | null
+}
+
+async function recordPrincipalAudit(
+  c: Context,
+  principal: McpPrincipal,
+  metadata: ReturnType<typeof mcpRequestMetadata>,
+  ipAddress: string,
+  userAgent: string | null,
+  fields: AuditFields,
+): Promise<void> {
+  if (principal.kind === 'oauth') {
+    await recordOAuthMcpAuditEvent({
+      oauthTokenId: principal.oauthTokenId,
+      userId: principal.userId,
+      clientId: principal.clientId,
+      clientName: metadata.clientName,
+      // The per-call `repository` argument (metadata.repositoryArg) is a ref — an id
+      // OR a name — and is not guaranteed to be a valid `repositories.id`. The audit
+      // column `repository_id` is a uuid FK, so inserting a raw ref would risk an FK
+      // violation. The clientId + oauthTokenId + toolName already identify the call,
+      // so we deliberately record `null` here.
+      repositoryId: null,
+      ipAddress,
+      userAgent,
+      method: metadata.method,
+      toolName: metadata.toolName,
+      latencyMs: fields.latencyMs,
+      status: fields.status,
+      statusCode: fields.statusCode,
+      errorCode: fields.errorCode,
+    })
+    return
+  }
+
+  const token = c.get('mcpToken')
+  await recordMcpAuditEvent({
+    token,
+    clientLabel: token.label,
+    clientName: metadata.clientName,
+    ipAddress,
+    userAgent,
+    method: metadata.method,
+    toolName: metadata.toolName,
+    latencyMs: fields.latencyMs,
+    status: fields.status,
+    statusCode: fields.statusCode,
+    errorCode: fields.errorCode,
+  })
 }
 
 async function handleAuditedRequest(
@@ -79,7 +163,7 @@ async function handleAuditedRequest(
   body?: unknown,
 ): Promise<Response> {
   const startedAt = Date.now()
-  const token = c.get('mcpToken')
+  const principal = c.get('mcpPrincipal')
   const ipAddress = clientIp(c)
   const userAgent = c.req.header('user-agent') ?? null
   const metadata = mcpRequestMetadata(body, c.req.method)
@@ -92,14 +176,7 @@ async function handleAuditedRequest(
         : await transport.handleRequest(c.req.raw, { parsedBody: body })
 
     const status = response.status >= 400 ? 'failure' : 'success'
-    await recordMcpAuditEvent({
-      token,
-      clientLabel: token.label,
-      clientName: metadata.clientName,
-      ipAddress,
-      userAgent,
-      method: metadata.method,
-      toolName: metadata.toolName,
+    await recordPrincipalAudit(c, principal, metadata, ipAddress, userAgent, {
       latencyMs: Date.now() - startedAt,
       status,
       statusCode: response.status,
@@ -107,26 +184,29 @@ async function handleAuditedRequest(
     })
 
     if (status === 'success') {
-      await raiseSuspiciousUseAlerts({ token, ipAddress, userAgent })
-      await touchMcpTokenUsage({
-        token,
-        ipAddress,
-        userAgent,
-        clientName: metadata.clientName,
-        toolName: metadata.toolName,
-      })
+      if (principal.kind === 'oauth') {
+        await touchOAuthGrantUsage(principal.oauthTokenId, {
+          ip: ipAddress,
+          userAgent,
+          clientName: metadata.clientName,
+          toolName: metadata.toolName,
+        })
+      } else {
+        const token = c.get('mcpToken')
+        await raiseSuspiciousUseAlerts({ token, ipAddress, userAgent })
+        await touchMcpTokenUsage({
+          token,
+          ipAddress,
+          userAgent,
+          clientName: metadata.clientName,
+          toolName: metadata.toolName,
+        })
+      }
     }
 
     return response
   } catch (err) {
-    await recordMcpAuditEvent({
-      token,
-      clientLabel: token.label,
-      clientName: metadata.clientName,
-      ipAddress,
-      userAgent,
-      method: metadata.method,
-      toolName: metadata.toolName,
+    await recordPrincipalAudit(c, principal, metadata, ipAddress, userAgent, {
       latencyMs: Date.now() - startedAt,
       status: 'failure',
       statusCode: response?.status ?? 500,
@@ -141,37 +221,38 @@ async function auditFailureResponse(
   body: unknown,
   response: Response,
 ): Promise<Response> {
-  const token = c.get('mcpToken')
+  const principal = c.get('mcpPrincipal')
   const metadata = mcpRequestMetadata(body, c.req.method)
-  await recordMcpAuditEvent({
-    token,
-    clientLabel: token.label,
-    clientName: metadata.clientName,
-    ipAddress: clientIp(c),
-    userAgent: c.req.header('user-agent') ?? null,
-    method: metadata.method,
-    toolName: metadata.toolName,
-    latencyMs: 0,
-    status: 'failure',
-    statusCode: response.status,
-    errorCode: String(response.status),
-  })
+  await recordPrincipalAudit(
+    c,
+    principal,
+    metadata,
+    clientIp(c),
+    c.req.header('user-agent') ?? null,
+    {
+      latencyMs: 0,
+      status: 'failure',
+      statusCode: response.status,
+      errorCode: String(response.status),
+    },
+  )
   return response
 }
 
 // ─── POST /api/mcp — initialize or relay a client request ─────────────────────
 
 mcpRoutes.post('/', async (c) => {
-  const repositoryId = c.get('mcpRepositoryId')
-  const token = c.get('mcpToken')
+  const principal = c.get('mcpPrincipal')
+  const principalKey =
+    principal.kind === 'oauth' ? `oauth:${principal.userId}` : `static:${principal.mcpTokenId}`
   const sessionId = c.req.header('mcp-session-id')
   const body = (await c.req.json().catch(() => undefined)) as unknown
 
   let transport: WebStandardStreamableHTTPServerTransport
 
   if (sessionId) {
-    const existing = sessions.get(sessionId)
-    if (!existing || existing.repositoryId !== repositoryId) {
+    const existing = sessions.get(sessionId, principalKey)
+    if (!existing) {
       return auditFailureResponse(
         c,
         body,
@@ -187,26 +268,39 @@ mcpRoutes.post('/', async (c) => {
     }
     transport = existing.transport
   } else if (isInitializeRequest(body)) {
-    const aiSettings = await getAiSettingsForRepo(repositoryId)
-    const embeddingState = await getRepositoryEmbeddingState(repositoryId, aiSettings)
-    const embeddingOptions = getEmbeddingOptionsForProfile(aiSettings, embeddingState.storedProfile)
-    const enabledTools = mcpToolsForScopes(normalizeContextScopes(token.scopes))
+    // The transport invokes these callbacks only after this constructor assigns the binding.
+    const lifecycle = createMcpSessionLifecycleHandlers({
+      sessions,
+      principalKey,
+      getTransport: () => transport,
+      closeEvictedSessions: closeMcpSessions,
+    })
 
     transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
-      onsessioninitialized: (sid) => {
-        sessions.set(sid, { transport, repositoryId })
-      },
-      onsessionclosed: (sid) => {
-        sessions.delete(sid)
-      },
+      onsessioninitialized: lifecycle.onsessioninitialized,
+      onsessionclosed: lifecycle.onsessionclosed,
     })
-    transport.onclose = () => {
-      const sid = transport.sessionId
-      if (sid) sessions.delete(sid)
-    }
+    transport.onclose = lifecycle.onclose
 
-    const server = createMcpServer(repositoryId, { embeddingOptions, enabledTools })
+    let server: ReturnType<typeof createUserScopedMcpServer>
+    if (principal.kind === 'oauth') {
+      server = createUserScopedMcpServer(buildUserServerDeps(principal.userId))
+    } else if (principal.repositoryId === null) {
+      // user-level CI token: user-scoped server, scope-gated
+      const enabledTools = mcpToolsForScopes(normalizeContextScopes(principal.scopes))
+      server = createUserScopedMcpServer(buildUserServerDeps(principal.userId), { enabledTools })
+    } else {
+      // grandfathered per-repo token: repo-implied server (unchanged old behavior)
+      const aiSettings = await getAiSettingsForRepo(principal.repositoryId)
+      const embeddingState = await getRepositoryEmbeddingState(principal.repositoryId, aiSettings)
+      const embeddingOptions = getEmbeddingOptionsForProfile(
+        aiSettings,
+        embeddingState.storedProfile,
+      )
+      const enabledTools = mcpToolsForScopes(normalizeContextScopes(principal.scopes))
+      server = createMcpServer(principal.repositoryId, { embeddingOptions, enabledTools })
+    }
     await server.connect(transport)
   } else {
     return auditFailureResponse(
@@ -229,10 +323,12 @@ mcpRoutes.post('/', async (c) => {
 // ─── GET & DELETE /api/mcp — operate on an existing session ───────────────────
 
 async function handleSessionRequest(c: Context): Promise<Response> {
-  const repositoryId = c.get('mcpRepositoryId')
+  const principal = c.get('mcpPrincipal')
+  const principalKey =
+    principal.kind === 'oauth' ? `oauth:${principal.userId}` : `static:${principal.mcpTokenId}`
   const sessionId = c.req.header('mcp-session-id')
-  const existing = sessionId ? sessions.get(sessionId) : undefined
-  if (!existing || existing.repositoryId !== repositoryId) {
+  const existing = sessionId ? sessions.get(sessionId, principalKey) : undefined
+  if (!existing) {
     return auditFailureResponse(c, undefined, c.text('Invalid or missing session ID', 400))
   }
   return handleAuditedRequest(c, existing.transport)

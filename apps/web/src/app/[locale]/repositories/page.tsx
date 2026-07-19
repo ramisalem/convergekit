@@ -1,16 +1,41 @@
 'use client'
 
 import { AddRepositoryDialog } from '@/components/add-repository-dialog'
+import {
+  formatRepositoryListFreshnessLine,
+  type IncrementalIndexingSummary,
+} from '@/components/repository-detail/incremental-freshness'
 import { ClientTime } from '@/components/ui/client-time'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatusChip } from '@/components/ui/status-chip'
 import { useUser } from '@/components/user-nav'
-import { ApiError, repositoriesApi } from '@/lib/api-client'
+import { ApiError, fetchRepositoryDetailRecord, repositoriesApi } from '@/lib/api-client'
+import { markPerf } from '@/lib/perf-marks'
+import {
+  getRepositoryList,
+  loadSessionMirror,
+  prefetchRepository,
+  setRepositoryCacheOwner,
+  setRepositoryList,
+} from '@/lib/repository-cache'
 import type { RepositoryResponse } from '@convergekit/types'
 import { ChevronDown, ChevronRight, GitBranch, ListFilter, Plus, Search } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+
+type RepositoryListSummary = {
+  chatCount?: number | null
+  indexedAt?: string | null
+  loc?: number | null
+  primaryLanguage?: string | null
+}
+
+type RepositoryWithListSummary = RepositoryResponse & {
+  listSummary?: RepositoryListSummary | null
+  incrementalIndexing?: IncrementalIndexingSummary | null
+}
 
 function ProviderBadge({ provider }: { provider: RepositoryResponse['provider'] }) {
   return (
@@ -33,7 +58,7 @@ function formatChatCount(count: number | null | undefined) {
   return `${safeCount} ${safeCount === 1 ? 'chat' : 'chats'}`
 }
 
-function RepositoryActivity({ repo }: { repo: RepositoryResponse }) {
+function RepositoryActivity({ repo }: { repo: RepositoryWithListSummary }) {
   const indexedAt = repo.listSummary?.indexedAt ?? repo.indexedAt
 
   if (repo.status === 'processing') {
@@ -55,22 +80,21 @@ function RepositoryActivity({ repo }: { repo: RepositoryResponse }) {
   )
 }
 
-function RepositoryRow({ repo }: { repo: RepositoryResponse }) {
+function RepositoryRow({ repo, locale }: { repo: RepositoryWithListSummary; locale: string }) {
   return (
-    <a
-      href={`/repositories/${repo.id}`}
+    <Link
+      href={`/${locale}/repositories/${repo.id}`}
+      prefetch
+      onMouseEnter={() => prefetchRepository(repo.id, fetchRepositoryDetailRecord)}
+      onFocus={() => prefetchRepository(repo.id, fetchRepositoryDetailRecord)}
       className="grid grid-cols-[28px_minmax(0,1.5fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-[var(--convergekit-line-2)] px-4 py-3 transition-colors last:border-b-0 hover:bg-[var(--convergekit-bg-2)]"
     >
       <div className="grid h-7 w-7 place-items-center rounded-md bg-[var(--convergekit-bg-3)] text-[var(--convergekit-ink-3)]">
         <GitBranch className="h-3.5 w-3.5" />
       </div>
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-[var(--convergekit-ink)]">
-          {repo.name}
-        </p>
-        <p className="truncate font-mono text-xs text-[var(--convergekit-ink-3)]">
-          {repo.cloneUrl}
-        </p>
+        <p className="truncate text-sm font-semibold text-[var(--convergekit-ink)]">{repo.name}</p>
+        <p className="truncate font-mono text-xs text-[var(--convergekit-ink-3)]">{repo.cloneUrl}</p>
       </div>
       <div className="min-w-0 flex flex-col gap-0.5">
         <p className="truncate text-[12.5px] text-[var(--convergekit-ink-2)]">
@@ -79,6 +103,12 @@ function RepositoryRow({ repo }: { repo: RepositoryResponse }) {
         <p className="truncate text-xs text-[var(--convergekit-ink-4)]">
           {formatCompactLoc(repo.listSummary?.loc)} · {formatChatCount(repo.listSummary?.chatCount)}
         </p>
+        {(() => {
+          const freshness = formatRepositoryListFreshnessLine(repo.incrementalIndexing, new Date())
+          return freshness ? (
+            <p className="truncate text-[11px] text-[var(--convergekit-ink-4)]">{freshness}</p>
+          ) : null
+        })()}
       </div>
       <div className="text-right text-[12.5px] text-[var(--convergekit-ink-3)]">
         <RepositoryActivity repo={repo} />
@@ -88,7 +118,7 @@ function RepositoryRow({ repo }: { repo: RepositoryResponse }) {
         <StatusChip status={repo.status} />
         <ChevronRight className="h-4 w-4 text-[var(--convergekit-ink-4)]" />
       </div>
-    </a>
+    </Link>
   )
 }
 
@@ -108,6 +138,31 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
         <Plus className="h-4 w-4" />
         {t('addRepository')}
       </button>
+    </div>
+  )
+}
+
+function RepositoryListSkeleton() {
+  return (
+    <div className="mt-6 overflow-hidden rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div
+          key={i}
+          className="grid grid-cols-[28px_minmax(0,1.5fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-[var(--convergekit-line-2)] px-4 py-3 last:border-b-0"
+        >
+          <div className="h-7 w-7 animate-pulse rounded-md bg-[var(--convergekit-bg-3)]" />
+          <div className="min-w-0 space-y-1.5">
+            <div className="h-3.5 w-40 animate-pulse rounded bg-[var(--convergekit-bg-3)]" />
+            <div className="h-3 w-56 animate-pulse rounded bg-[var(--convergekit-bg-3)]" />
+          </div>
+          <div className="min-w-0 space-y-1.5">
+            <div className="h-3 w-24 animate-pulse rounded bg-[var(--convergekit-bg-3)]" />
+            <div className="h-3 w-16 animate-pulse rounded bg-[var(--convergekit-bg-3)]" />
+          </div>
+          <div className="h-3 w-20 animate-pulse justify-self-end rounded bg-[var(--convergekit-bg-3)]" />
+          <div className="h-[22px] w-24 animate-pulse rounded-md bg-[var(--convergekit-bg-3)]" />
+        </div>
+      ))}
     </div>
   )
 }
@@ -150,12 +205,15 @@ function NoRepositoriesAssignedState({
 
 export default function RepositoriesPage() {
   const t = useTranslations('repositories')
-  const { user } = useUser()
+  const { user, loading: userLoading } = useUser()
+  const { locale } = useParams<{ locale: string }>()
   const router = useRouter()
   const isAdmin = user?.role === 'admin'
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [repositories, setRepositories] = useState<RepositoryResponse[]>([])
-  const [loading, setLoading] = useState(true)
+  const [repositories, setRepositories] = useState<RepositoryResponse[]>(
+    () => getRepositoryList() ?? [],
+  )
+  const [loading, setLoading] = useState(() => getRepositoryList() === null)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | RepositoryResponse['status']>('all')
@@ -164,11 +222,35 @@ export default function RepositoriesPage() {
   )
 
   useEffect(() => {
+    if (userLoading) return
+    if (!user) {
+      setRepositories([])
+      setLoading(false)
+      router.replace('/auth/sign-in')
+      return
+    }
+    setRepositoryCacheOwner(user.id)
+    markPerf('repositories:list:start')
+    if (getRepositoryList() !== null) markPerf('repositories:list:paint-cached')
+
+    // After hydration, restore from the session mirror if memory is empty.
+    if (getRepositoryList() === null) {
+      loadSessionMirror()
+      const mirrored = getRepositoryList()
+      if (mirrored) {
+        setRepositories(mirrored)
+        setLoading(false)
+      }
+    }
+
     let cancelled = false
     repositoriesApi
       .list()
       .then(({ repositories }) => {
-        if (!cancelled) setRepositories(repositories)
+        if (cancelled) return
+        setRepositoryList(repositories)
+        setRepositories(getRepositoryList() ?? repositories)
+        markPerf('repositories:list:fresh')
       })
       .catch((err) => {
         if (cancelled) return
@@ -177,7 +259,8 @@ export default function RepositoriesPage() {
           router.replace('/auth/sign-in')
           return
         }
-        setError('Failed to load repositories')
+        // Keep any cached data on screen; only surface an error with nothing to show.
+        if (getRepositoryList() === null) setError('Failed to load repositories')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -185,7 +268,7 @@ export default function RepositoriesPage() {
     return () => {
       cancelled = true
     }
-  }, [router])
+  }, [router, user, userLoading])
 
   const filteredRepositories = repositories.filter((repo) => {
     const normalizedQuery = query.trim().toLowerCase()
@@ -221,9 +304,7 @@ export default function RepositoriesPage() {
         />
 
         {loading ? (
-          <div className="mt-6 flex items-center justify-center rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white py-16">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-600" />
-          </div>
+          <RepositoryListSkeleton />
         ) : error ? (
           <div className="mt-6 rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white px-6 py-12 text-center">
             <p className="text-sm text-[var(--convergekit-ink-3)]">{error}</p>
@@ -288,7 +369,7 @@ export default function RepositoriesPage() {
             {filteredRepositories.length > 0 ? (
               <div className="mt-3 overflow-hidden rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white">
                 {filteredRepositories.map((repo) => (
-                  <RepositoryRow key={repo.id} repo={repo} />
+                  <RepositoryRow key={repo.id} repo={repo} locale={locale} />
                 ))}
               </div>
             ) : (

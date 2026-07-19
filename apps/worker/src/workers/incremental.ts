@@ -1,4 +1,16 @@
-import { branches, db, documents, markBranchIndexed, upsertDocument } from '@convergekit/db'
+import {
+  branches,
+  db,
+  documents,
+  formatIncrementalFailure,
+  getIndexingRunById,
+  isRetryableIncrementalFailure,
+  markBranchIndexed,
+  redactUrlCredentials,
+  resolveAuthenticatedCloneUrl,
+  updateIndexingRun,
+  upsertDocument,
+} from '@convergekit/db'
 import {
   computeLinkedCodeContentHashes,
   deriveEvidenceAlignmentStatus,
@@ -6,13 +18,14 @@ import {
   extractLinkedCodePaths,
 } from '@convergekit/db/evidence-alignment'
 import { QUEUE_NAMES, WORKER_CONFIG, redis, type IncrementalJobData } from '@convergekit/queues'
-import { Worker, type Job } from 'bullmq'
-import { and, eq, sql } from 'drizzle-orm'
+import { UnrecoverableError, Worker, type Job } from 'bullmq'
+import { and, arrayOverlaps, eq } from 'drizzle-orm'
 import { extname, join } from 'node:path'
 import { simpleGit } from 'simple-git'
 import { assertBranchEmbeddingCompatibility, getEmbeddingOptionsForRepo } from '../lib/ai.js'
 import { flushChunkWrites, getIndexChunkBatchSize, type ChunkWrite } from '../lib/chunk-writes.js'
 import { chunkDocument } from '../lib/chunker.js'
+import { isShaLike } from '../lib/commit-range.js'
 import { cleanupWorkspace, getFileSizeBytes, readFileContent } from '../lib/fs.js'
 import {
   classifyRepositoryFile,
@@ -21,28 +34,59 @@ import {
 } from '../lib/indexing-limits.js'
 import { detectLanguage } from '../lib/language.js'
 import { logger } from '../logger.js'
+import { runIncrementalCheckSweep } from '../scheduler.js'
 
 const WORKSPACE_DIR = process.env.WORKSPACE_DIR ?? '/tmp/convergekit-workspace'
 
 async function processIncremental(job: Job<IncrementalJobData>): Promise<void> {
+  if (job.name === 'scheduler-tick') {
+    await runIncrementalCheckSweep()
+    return
+  }
+
   const { repositoryId, branchId, fromCommit, toCommit } = job.data
+  const runId = job.data.runId
   const workDir = join(WORKSPACE_DIR, `${repositoryId}-incremental`)
+
+  // Guard against orphaned jobs from earlier scheduler designs whose data carries
+  // a relative ref (e.g. fromCommit:'HEAD~1') instead of a resolved SHA. The
+  // current scheduler only enqueues explicit SHAs, so anything else is unrunnable;
+  // fail fast instead of cloning and retrying 3×.
+  if (!isShaLike(fromCommit) || !isShaLike(toCommit)) {
+    throw new UnrecoverableError(
+      `Refusing incremental job with non-SHA commit range ${fromCommit}..${toCommit} (orphaned scheduler job)`,
+    )
+  }
 
   const [branch] = await db.select().from(branches).where(eq(branches.id, branchId)).limit(1)
 
   if (!branch) throw new Error(`Branch ${branchId} not found`)
 
+  if (runId) {
+    await updateIndexingRun(runId, { status: 'processing', startedAt: new Date() })
+  }
   await job.updateProgress(5)
 
   try {
-    const git = simpleGit(workDir)
-
-    // Fetch the range and get the diff
-    await git.fetch(['origin'])
+    // Own the workspace lifecycle: clean any stale dir, then clone fresh enough
+    // history to diff fromCommit -> toCommit and read files at toCommit.
+    await cleanupWorkspace(workDir)
+    const cloneUrl = await resolveAuthenticatedCloneUrl(repositoryId)
+    if (!cloneUrl) throw new Error('Unable to resolve clone credentials')
+    const git = simpleGit()
+    try {
+      await git.clone(cloneUrl, workDir)
+    } catch (err) {
+      // simple-git's GitError embeds the authenticated clone URL (with token)
+      // in its message/command list — redact before it can reach any log.
+      throw new Error(redactUrlCredentials(err instanceof Error ? err.message : String(err)))
+    }
+    const repoGit = simpleGit(workDir)
+    await repoGit.checkout(toCommit)
     await job.updateProgress(20)
 
     // More reliable: use git diff --name-status
-    const diffOutput = await git.raw(['diff', '--name-status', fromCommit, toCommit])
+    const diffOutput = await repoGit.raw(['diff', '--name-status', fromCommit, toCommit])
     const changedFiles = parseDiffNameStatus(diffOutput)
 
     await job.updateProgress(40)
@@ -166,13 +210,44 @@ async function processIncremental(job: Job<IncrementalJobData>): Promise<void> {
     // Re-embed done: progress 90
     await job.updateProgress(90)
 
-    await markBranchIndexed(branchId, toCommit)
+    // Stale-worker guard: if a full re-index superseded this run, do NOT advance
+    // branch state. The full re-index is authoritative.
+    if (runId) {
+      const current = await getIndexingRunById(runId)
+      if (!current || current.status !== 'processing') {
+        logger.warn(
+          { repositoryId, branchId, runId, status: current?.status },
+          'Incremental run superseded; skipping branch advancement',
+        )
+        return
+      }
+    }
+
+    // Record the run as completed BEFORE advancing the branch, and make
+    // markBranchIndexed the last operation that can throw. This guarantees we
+    // never persist a `failed` run while the branch is actually fresh: if the
+    // completed-write (or progress ping) fails the branch has not advanced yet,
+    // so the catch's `failed` record is truthful and the next check retries.
+    if (runId) {
+      await updateIndexingRun(runId, {
+        status: 'completed',
+        changedFileCount: changedFiles.added.length + changedFiles.modified.length,
+        deletedFileCount: changedFiles.deleted.length,
+        skippedFileCount: skippedFiles.length,
+        chunkCount,
+        skippedEmbeddingCount: skippedEmbeddings,
+        finishedAt: new Date(),
+      })
+    }
+
     await job.updateProgress(100)
+    await markBranchIndexed(branchId, toCommit)
 
     logger.info(
       {
         repositoryId,
         branchId,
+        runId,
         added: changedFiles.added.length,
         modified: changedFiles.modified.length,
         deleted: changedFiles.deleted.length,
@@ -182,6 +257,32 @@ async function processIncremental(job: Job<IncrementalJobData>): Promise<void> {
       },
       'Incremental index complete',
     )
+  } catch (err) {
+    const { failureReason, failureCode } = formatIncrementalFailure(
+      err instanceof Error ? err.message : String(err),
+    )
+    if (runId) {
+      // Leave branches.indexedCommitSha at the previous successful commit and do
+      // not mark the repository failed — existing docs remain usable.
+      await updateIndexingRun(runId, {
+        status: 'failed',
+        failureReason,
+        failureCode,
+        finishedAt: new Date(),
+      }).catch(() => undefined)
+    }
+    // Log every failed attempt — the worker 'failed' handler only fires after the
+    // final retry. Log the sanitized reason/code, never the raw error.
+    logger.error(
+      { repositoryId, branchId, runId, failureCode },
+      `Incremental run failed: ${failureReason}`,
+    )
+    // Non-transient failures won't succeed on retry; stop BullMQ from re-cloning
+    // and re-embedding for nothing.
+    if (!isRetryableIncrementalFailure(failureCode)) {
+      throw new UnrecoverableError(failureReason)
+    }
+    throw err
   } finally {
     await cleanupWorkspace(workDir)
   }
@@ -208,7 +309,7 @@ async function refreshLinkedHistoricalDocs(input: {
       and(
         eq(documents.branchId, input.branchId),
         eq(documents.evidenceTier, 'D'),
-        sql`${documents.linkedCodePaths} && ${changedPaths}::text[]`,
+        arrayOverlaps(documents.linkedCodePaths, changedPaths),
       ),
     )
 

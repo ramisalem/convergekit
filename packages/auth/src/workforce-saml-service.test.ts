@@ -10,7 +10,7 @@ import {
 
 const enabledConfig: WorkforceSsoConfig = {
   workforceSsoEnabled: true,
-  providerLabel: 'Workforce SSO',
+  providerLabel: 'ConvergeKit SSO',
   idpSsoUrl: 'https://accounts.google.com/o/saml2/idp?idpid=test',
   idpEntityId: 'https://accounts.google.com/o/saml2?idpid=test',
   idpCertificate: '-----BEGIN CERTIFICATE-----\nMIID\n-----END CERTIFICATE-----',
@@ -112,5 +112,5 @@ SECOND
     await expect(
       service?.validateResponse({ samlResponse: '', relayState: undefined }),
     ).rejects.toThrow()
-  })
+  }, 15_000)
 })

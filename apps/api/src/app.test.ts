@@ -55,9 +55,6 @@ vi.mock('@convergekit/db', () => ({
     userId: 'account.userId',
     providerId: 'account.providerId',
   },
-  documents: {
-    content: 'documents.content',
-  },
   db: {
     query: {
       account: {
@@ -103,13 +100,29 @@ vi.mock('@convergekit/db', () => ({
     groupId: 'groupId',
     deactivatedAt: 'deactivatedAt',
   },
+  // ci-token-service.ts builds its ciTokenColumns select map from these at
+  // module-eval time, so the mock must define them (values are never queried here).
+  mcpTokens: {
+    id: 'mcpTokens.id',
+    label: 'mcpTokens.label',
+    fingerprint: 'mcpTokens.fingerprint',
+    scopes: 'mcpTokens.scopes',
+    expiresAt: 'mcpTokens.expiresAt',
+    revokedAt: 'mcpTokens.revokedAt',
+    revokedReason: 'mcpTokens.revokedReason',
+    lastUsedAt: 'mcpTokens.lastUsedAt',
+    lastUsedIp: 'mcpTokens.lastUsedIp',
+    lastUsedUserAgent: 'mcpTokens.lastUsedUserAgent',
+    lastUsedClientName: 'mcpTokens.lastUsedClientName',
+    lastUsedToolName: 'mcpTokens.lastUsedToolName',
+    createdAt: 'mcpTokens.createdAt',
+  },
 }))
 
 vi.mock('drizzle-orm', () => ({
   eq: (_column: unknown, value: unknown) => value,
   and: (...values: unknown[]) => values.find(Boolean),
   isNull: () => true,
-  sql: vi.fn(() => 'sql'),
 }))
 
 vi.mock('./lib/github-access.js', () => ({

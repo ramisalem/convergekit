@@ -6,12 +6,30 @@ import { WorkforceSsoSignInButton } from '@/components/workforce-sso-sign-in-but
 import { authConfigApi } from '@/lib/api-client'
 import { getApiBaseUrl } from '@/lib/runtime-urls'
 import { useTranslations } from 'next-intl'
+import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 const API_URL = getApiBaseUrl()
 
+// Open-redirect guard: only allow bouncing back to a same-origin target or the
+// configured API origin (where the MCP OAuth authorize endpoint lives).
+function safeRedirect(value: string | null): string | null {
+  if (!value) return null
+  try {
+    const url = new URL(value, window.location.origin)
+    const allowed = new Set([window.location.origin])
+    const apiBase = getApiBaseUrl()
+    if (apiBase) allowed.add(new URL(apiBase).origin)
+    return allowed.has(url.origin) ? url.toString() : null
+  } catch {
+    return null
+  }
+}
+
 export default function SignInPage() {
   const t = useTranslations('auth')
+  const searchParams = useSearchParams()
+  const redirectTo = safeRedirect(searchParams.get('redirectTo'))
   const [tab, setTab] = useState<'user' | 'admin'>('user')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -50,7 +68,7 @@ export default function SignInPage() {
         return
       }
 
-      window.location.href = '/'
+      window.location.href = redirectTo ?? '/'
     } catch {
       setError('Failed to sign in. Please try again.')
     } finally {
@@ -93,7 +111,7 @@ export default function SignInPage() {
           </div>
 
           {tab === 'admin' ? (
-            <GitHubSignInButton label={t('signInWithGitHub')} />
+            <GitHubSignInButton label={t('signInWithGitHub')} redirectTo={redirectTo} />
           ) : (
             <div className="space-y-4">
               {workforceSsoEnabled === null ? (
@@ -106,6 +124,7 @@ export default function SignInPage() {
                   <WorkforceSsoSignInButton
                     label={t('signInWithWorkforceSso', { provider: workforceSsoProviderLabel })}
                     disabled={!workforceSsoEnabled}
+                    redirectTo={redirectTo}
                   />
                   {!workforceSsoEnabled && (
                     <p className="text-center text-xs text-[var(--convergekit-ink-3)]">

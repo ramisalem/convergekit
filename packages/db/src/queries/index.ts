@@ -16,7 +16,10 @@ import {
   wikiPages,
 } from '../schema.js'
 
-const INTERNAL_DOCUMENT_PATHS = ['__mindmap__']
+// Internal/generated documents (e.g. the mind map) that must be excluded from
+// user-facing document lists and repository metrics. Shared so every consumer
+// stays consistent as the set grows.
+export const INTERNAL_DOCUMENT_PATHS = ['__mindmap__']
 
 // ─── Repositories ─────────────────────────────────────────────────────────────
 
@@ -41,6 +44,29 @@ export async function updateRepositoryStatus(
     .where(eq(repositories.id, id))
     .returning()
   return updated
+}
+
+export async function getRepositoriesMetaByIds(ids: string[]) {
+  if (ids.length === 0) return []
+  const rows = await db
+    .select({
+      id: repositories.id,
+      name: repositories.name,
+      defaultBranch: repositories.defaultBranch,
+      status: repositories.status,
+      lastIndexedAt: sql<Date | null>`max(${branches.lastIndexedAt})`,
+    })
+    .from(repositories)
+    .leftJoin(branches, eq(branches.repositoryId, repositories.id))
+    .where(and(inArray(repositories.id, ids), isNull(repositories.deletedAt)))
+    .groupBy(repositories.id, repositories.name, repositories.defaultBranch, repositories.status)
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    defaultBranch: r.defaultBranch,
+    status: r.status,
+    lastIndexedAt: r.lastIndexedAt ? new Date(r.lastIndexedAt).toISOString() : null,
+  }))
 }
 
 // ─── Documents ────────────────────────────────────────────────────────────────
@@ -409,3 +435,10 @@ export async function updateWikiPage(
     .returning()
   return updated
 }
+
+// ─── Incremental indexing ──────────────────────────────────────────────────────
+
+export * from './indexing-runs.js'
+export * from './incremental-check.js'
+export * from './clone-credentials.js'
+export * from './repository-listing-topics.js'

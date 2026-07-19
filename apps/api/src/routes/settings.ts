@@ -6,8 +6,6 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { AppError } from '../errors.js'
 
-// Auth/admin enforcement for /api/settings/* is applied in createApp().
-// Keep this router middleware-free so route tests can verify response DTOs directly.
 export const settingsRoutes = new Hono()
 
 const ENCRYPTION_SECRET = process.env.BETTER_AUTH_SECRET ?? ''

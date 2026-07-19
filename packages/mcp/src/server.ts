@@ -15,6 +15,7 @@
 import { getDocumentByPath, getDocumentPaths, searchChunks, type SearchOptions } from '@convergekit/db'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
+import { searchDocsQuerySchema } from './tool-schemas.js'
 
 type EnabledMcpTools = {
   getStructure?: boolean
@@ -48,7 +49,7 @@ export function createMcpServer(
       'search_docs',
       'Search the repository codebase using hybrid semantic and keyword search. Returns the most relevant code chunks with file path and line numbers.',
       {
-        query: z.string().min(1).max(500).describe('The search query'),
+        query: searchDocsQuerySchema,
         limit: z
           .number()
           .int()

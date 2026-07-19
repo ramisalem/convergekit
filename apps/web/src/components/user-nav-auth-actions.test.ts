@@ -11,6 +11,16 @@ describe('user nav auth actions', () => {
     expect(source).not.toContain('/api/sign-out')
   })
 
+  it('clears repository cache on explicit sign-out', () => {
+    const source = readSource('src/components/sign-out-button.tsx')
+
+    expect(source).toContain("import { clearRepositoryCache } from '@/lib/repository-cache'")
+    expect(source).toContain('clearRepositoryCache()')
+    expect(source.indexOf('clearRepositoryCache()')).toBeLessThan(
+      source.indexOf("window.location.href = '/auth/sign-in'"),
+    )
+  })
+
   it('renders sign out from shared user nav for every signed-in role', () => {
     const source = readSource('src/components/user-nav.tsx')
 

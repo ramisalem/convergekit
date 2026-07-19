@@ -30,6 +30,10 @@ RUN pnpm --filter @convergekit/api... build
 FROM node:22-alpine AS runner
 WORKDIR /app
 
+# git is required at runtime: the incremental-indexing "Check now" endpoint
+# resolves the remote head via simple-git (git ls-remote).
+RUN apk add --no-cache git
+
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
 ENV NODE_ENV=production

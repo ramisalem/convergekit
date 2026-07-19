@@ -35,7 +35,7 @@ export const env = createEnv({
 
     // Workforce SSO (explicitly gated by WORKFORCE_SSO_ENABLED)
     WORKFORCE_SSO_ENABLED: z.enum(['true', 'false']).default('false'),
-    WORKFORCE_SSO_PROVIDER_LABEL: optionalNonEmptyString.default('Workforce SSO'),
+    WORKFORCE_SSO_PROVIDER_LABEL: optionalNonEmptyString.default('ConvergeKit SSO'),
     WORKFORCE_SAML_IDP_SSO_URL: optionalNonEmptyString,
     WORKFORCE_SAML_IDP_ENTITY_ID: optionalNonEmptyString,
     WORKFORCE_SAML_IDP_CERT: optionalNonEmptyString,
@@ -49,6 +49,10 @@ export const env = createEnv({
 
     // Access-request contacts shown to signed-in users with no repositories.
     ACCESS_SUPPORT_ADMIN_EMAILS: optionalNonEmptyString,
+
+    // ─── MCP OAuth (gated by MCP_OAUTH_ENABLED; ships dark) ─────────────────────
+    MCP_OAUTH_ENABLED: z.enum(['true', 'false']).default('false'),
+    MCP_OAUTH_ISSUER_URL: z.string().url().optional(),
 
     // ─── App runtime ──────────────────────────────────────────────────────────
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),

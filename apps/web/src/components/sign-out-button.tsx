@@ -1,5 +1,6 @@
 'use client'
 
+import { clearRepositoryCache } from '@/lib/repository-cache'
 import { LogOut } from 'lucide-react'
 import { useState } from 'react'
 
@@ -22,6 +23,7 @@ export function SignOutButton({
       body: '{}',
     }).catch(() => undefined)
 
+    clearRepositoryCache()
     window.location.href = '/auth/sign-in'
   }
 

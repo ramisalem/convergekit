@@ -8,5 +8,12 @@ export function AdminNavLinks({ settingsLabel }: { settingsLabel: string }) {
 
   if (user?.role !== 'admin') return null
 
-  return <NavLinks items={[{ href: '/settings', label: settingsLabel }]} />
+  return (
+    <NavLinks
+      items={[
+        { href: '/settings', label: settingsLabel },
+        { href: '/admin/analytics', label: 'Analytics' },
+      ]}
+    />
+  )
 }

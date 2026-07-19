@@ -7,14 +7,16 @@ const API_URL = getApiBaseUrl()
 type WorkforceSsoSignInButtonProps = {
   label: string
   disabled?: boolean
+  redirectTo?: string | null
 }
 
 export function WorkforceSsoSignInButton({
   label,
   disabled = false,
+  redirectTo,
 }: WorkforceSsoSignInButtonProps) {
   function handleClick() {
-    const relayState = encodeURIComponent('/en/repositories')
+    const relayState = encodeURIComponent(redirectTo ?? '/en/repositories')
     window.location.href = `${API_URL}/api/auth/workforce-saml/login?RelayState=${relayState}`
   }
 

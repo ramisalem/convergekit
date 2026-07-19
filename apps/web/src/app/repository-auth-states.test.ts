@@ -8,7 +8,10 @@ describe('repository auth and loading states', () => {
 
     expect(listSource).toContain('if (err instanceof ApiError && err.status === 401)')
     expect(listSource).toContain("router.replace('/auth/sign-in')")
-    expect(listSource).toContain('const [loading, setLoading] = useState(true)')
+    // Loading starts true whenever there is no cached list (always the case on a
+    // fresh/unauthenticated load), so the page never flashes an empty state before
+    // the fetch resolves or redirects.
+    expect(listSource).toContain('const [loading, setLoading] = useState(() => getRepositoryList() === null)')
 
     expect(detailSource).toContain('if (err instanceof ApiError && err.status === 401)')
     expect(detailSource).toContain("router.replace('/auth/sign-in')")

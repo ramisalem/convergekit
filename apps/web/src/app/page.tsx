@@ -7,10 +7,11 @@ export default function HomePage() {
         <ConvergeKitLogoMark className="mx-auto h-10 w-10" title="ConvergeKit" />
         <p className="mt-4 text-sm font-semibold text-[var(--convergekit-ink-3)]">ConvergeKit</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-normal text-[var(--convergekit-ink)]">
-          Bring product intent, code reality, and agent context together.
+          The shared source of truth for product, engineering, and AI agents.
         </h1>
         <p className="mt-4 text-base leading-relaxed text-[var(--convergekit-ink-3)]">
-          Align product teams, engineers, and AI agents around what the code actually does.
+          Understand what the code actually does, why decisions were made, and where work should
+          happen next.
         </p>
       </div>
     </main>

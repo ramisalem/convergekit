@@ -34,7 +34,7 @@ const urlSchema = z.string().url()
 
 const workforceSsoEnvSchema = z.object({
   WORKFORCE_SSO_ENABLED: z.enum(['true', 'false']).optional().default('false'),
-  WORKFORCE_SSO_PROVIDER_LABEL: optionalNonEmpty.transform((value) => value ?? 'Workforce SSO'),
+  WORKFORCE_SSO_PROVIDER_LABEL: optionalNonEmpty.transform((value) => value ?? 'ConvergeKit SSO'),
   WORKFORCE_SAML_IDP_SSO_URL: optionalNonEmpty,
   WORKFORCE_SAML_IDP_ENTITY_ID: optionalNonEmpty,
   WORKFORCE_SAML_IDP_CERT: optionalNonEmpty,

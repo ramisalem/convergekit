@@ -9,12 +9,14 @@ import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { NotFoundError, ValidationError } from '../errors.js'
 import { buildInviteUrl, issueInviteToken } from '../lib/invites.js'
+import { emitMcpOAuthEvent } from '../lib/mcp-oauth-events.js'
+import { deleteSessionsForUser, revokeMcpTokensNoLongerAllowed } from '../lib/mcp-token-security.js'
 import {
-  deleteSessionsForUser,
-  revokeActiveMcpTokensForUser,
-  revokeActiveMcpTokensForUsers,
-  revokeMcpTokensNoLongerAllowed,
-} from '../lib/mcp-token-security.js'
+  deactivateUsers,
+  disableCapability,
+  lockUsers,
+  revokeAllForUser,
+} from '../lib/user-mutations.js'
 
 export const userManagementRoutes = new Hono()
 
@@ -29,6 +31,7 @@ const updateUserSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   groupId: z.string().nullable().optional(),
   role: z.enum(['admin', 'user']).optional(),
+  ciTokensEnabled: z.boolean().optional(),
 })
 
 const bulkUpdateSchema = z.object({
@@ -36,6 +39,7 @@ const bulkUpdateSchema = z.object({
   groupId: z.string().nullable().optional(),
   role: z.enum(['admin', 'user']).optional(),
   deactivated: z.boolean().optional(),
+  ciTokensEnabled: z.boolean().optional(),
 })
 
 function assertUserEmailAllowed(email: string): void {
@@ -88,6 +92,7 @@ userManagementRoutes.get('/', async (c) => {
       groupId: user.groupId,
       deactivatedAt: user.deactivatedAt,
       createdAt: user.createdAt,
+      ciTokensEnabled: user.ciTokensEnabled,
     })
     .from(user)
 
@@ -137,14 +142,22 @@ userManagementRoutes.post('/', async (c) => {
   return c.json({ user: created, inviteUrl }, 201)
 })
 
-// PATCH /api/users/bulk — bulk update groupId and/or role
+// PATCH /api/users/bulk — bulk update groupId, role, ciTokensEnabled, and/or deactivated
 // NOTE: Must be registered before /:id routes so Hono matches /bulk literally.
 userManagementRoutes.patch('/bulk', async (c) => {
   const requestingUserId = c.get('userId')
   const body = bulkUpdateSchema.parse(await c.req.json())
 
-  if (body.role === undefined && body.groupId === undefined && body.deactivated === undefined) {
-    return c.json({ error: 'Provide role, groupId, and/or deactivated to update' }, 400)
+  if (
+    body.role === undefined &&
+    body.groupId === undefined &&
+    body.deactivated === undefined &&
+    body.ciTokensEnabled === undefined
+  ) {
+    return c.json(
+      { error: 'Provide role, groupId, ciTokensEnabled, and/or deactivated to update' },
+      400,
+    )
   }
 
   if (body.role === 'user' && body.userIds.includes(requestingUserId)) {
@@ -154,24 +167,68 @@ userManagementRoutes.patch('/bulk', async (c) => {
   if (body.deactivated === true && body.userIds.includes(requestingUserId)) {
     return c.json({ error: 'Cannot deactivate your own account' }, 400)
   }
+  // No self-guard on ciTokensEnabled: an admin may enable/disable their own CI
+  // capability (unlike role/deactivated) — a sole admin must be able to enable themselves.
 
+  const deactivating = body.deactivated === true
+  const disablingCiTokens = body.ciTokensEnabled === false
+
+  // deactivatedAt (true case) and ciTokensEnabled (false case) are written by the
+  // locked helpers below — every other field is a plain patch, applied after the
+  // ordered lock but before the helpers, in the same transaction, so the helpers'
+  // revoke passes see the final row state.
   const patch: Record<string, unknown> = { updatedAt: new Date() }
   if (body.role !== undefined) patch.role = body.role
   if (body.groupId !== undefined) patch.groupId = body.groupId
-  if (body.deactivated !== undefined) patch.deactivatedAt = body.deactivated ? new Date() : null
+  if (body.deactivated === false) patch.deactivatedAt = null
+  if (body.ciTokensEnabled === true) patch.ciTokensEnabled = true
+  // updatedAt is always seeded; the helpers bump it themselves, so when no plain
+  // field accompanies the mutation the patch UPDATE is pure churn — skip it.
+  const hasPatchFields = Object.keys(patch).length > 1
 
-  const updated = await db
-    .update(user)
-    .set(patch)
-    .where(inArray(user.id, body.userIds))
-    .returning({ id: user.id })
+  let updatedIds: string[]
 
-  const updatedIds = updated.map((u) => u.id)
-  if (body.deactivated === true) {
-    await revokeActiveMcpTokensForUsers(updatedIds, 'user_deactivated')
+  if (deactivating) {
+    // Superset branch: also folds in a bundled ciTokensEnabled:false so each
+    // row's revoke reason stays precise (disableCapability's user-level sweep
+    // tags 'ci_tokens_disabled'; deactivateUsers' blanket sweep then only catches
+    // whatever it left, tagged 'user_deactivated').
+    const result = await db.transaction(async (tx) => {
+      // Ordered lock FIRST — the plain patch UPDATE would otherwise grab row
+      // locks in scan order; the helpers' internal re-lock is then a no-op.
+      await lockUsers(tx, body.userIds)
+      if (hasPatchFields) {
+        await tx.update(user).set(patch).where(inArray(user.id, body.userIds))
+      }
+      if (disablingCiTokens) await disableCapability(tx, body.userIds)
+      return deactivateUsers(tx, body.userIds)
+    })
+    updatedIds = result.users.map((u) => u.id)
     await Promise.all(updatedIds.map((id) => deleteSessionsForUser(id)))
-  } else if (body.role !== undefined || body.groupId !== undefined || body.deactivated === false) {
-    await revokeMcpTokensNoLongerAllowed(updatedIds, 'access_changed')
+    for (const id of updatedIds) {
+      emitMcpOAuthEvent('token_revoked', { userId: id, initiator: 'deactivation' })
+    }
+  } else if (disablingCiTokens) {
+    const result = await db.transaction(async (tx) => {
+      await lockUsers(tx, body.userIds)
+      if (hasPatchFields) {
+        await tx.update(user).set(patch).where(inArray(user.id, body.userIds))
+      }
+      return disableCapability(tx, body.userIds)
+    })
+    updatedIds = result.map((u) => u.id)
+  } else {
+    const updated = await db
+      .update(user)
+      .set(patch)
+      .where(inArray(user.id, body.userIds))
+      .returning({ id: user.id })
+    updatedIds = updated.map((u) => u.id)
+    // Flag changes never belong in this sweep: disable revokes atomically in-tx via
+    // disableCapability (its own branch), and enable can never reduce access.
+    if (body.role !== undefined || body.groupId !== undefined || body.deactivated === false) {
+      await revokeMcpTokensNoLongerAllowed(updatedIds, 'access_changed')
+    }
   }
 
   return c.json({ updated: updatedIds })
@@ -185,7 +242,7 @@ userManagementRoutes.get('/:id', async (c) => {
   return c.json({ user: dbUser })
 })
 
-// PUT /api/users/:id — update name / role / groupId
+// PUT /api/users/:id — update name / role / groupId / ciTokensEnabled
 userManagementRoutes.put('/:id', async (c) => {
   const id = c.req.param('id')
   const requestingUserId = c.get('userId')
@@ -194,28 +251,44 @@ userManagementRoutes.put('/:id', async (c) => {
   if (id === requestingUserId && body.role === 'user') {
     return c.json({ error: 'Cannot change your own admin role' }, 400)
   }
+  // No self-guard on ciTokensEnabled: an admin may enable/disable their own CI
+  // capability (unlike role/deactivated) — a sole admin must be able to enable themselves.
 
-  const [updated] = await db
-    .update(user)
-    .set({ ...body, updatedAt: new Date() })
-    .where(eq(user.id, id))
-    .returning()
+  const disablingCiTokens = body.ciTokensEnabled === false
+  const { ciTokensEnabled, ...otherFields } = body
+  const fieldPatch: Record<string, unknown> = { ...otherFields, updatedAt: new Date() }
+  if (ciTokensEnabled === true) fieldPatch.ciTokensEnabled = true
+
+  // Other fields write first, then disableCapability locks + flips the flag +
+  // revokes — all in the SAME transaction, so its revoke evaluates repo-scoping
+  // against the post-write (this request's) state, not the pre-request row.
+  const updated = await db.transaction(async (tx) => {
+    const [row] = await tx.update(user).set(fieldPatch).where(eq(user.id, id)).returning()
+    if (!row) return null
+    if (!disablingCiTokens) return row
+
+    const [disabled] = await disableCapability(tx, [id])
+    return disabled ?? row
+  })
 
   if (!updated) throw new NotFoundError('User')
-  if (body.role !== undefined || body.groupId !== undefined) {
+
+  // ciTokensEnabled deliberately absent: disable revokes atomically inside the
+  // transaction (disableCapability); a pure enable can never reduce access.
+  if (!disablingCiTokens && (body.role !== undefined || body.groupId !== undefined)) {
     await revokeMcpTokensNoLongerAllowed([id], 'access_changed')
   }
+
   return c.json({ user: updated })
 })
 
-// POST /api/users/:id/mcp-tokens/revoke-all — admin emergency revocation
+// POST /api/users/:id/mcp-tokens/revoke-all — admin emergency revocation (static-token kill-switch)
 userManagementRoutes.post('/:id/mcp-tokens/revoke-all', async (c) => {
   const id = c.req.param('id')
 
-  const [target] = await db.select({ id: user.id }).from(user).where(eq(user.id, id)).limit(1)
-  if (!target) throw new NotFoundError('User')
+  const revoked = await db.transaction((tx) => revokeAllForUser(tx, id))
+  if (revoked === null) throw new NotFoundError('User')
 
-  const revoked = await revokeActiveMcpTokensForUser(id, 'admin_user_revoke_all')
   return c.json({ revoked })
 })
 
@@ -228,16 +301,16 @@ userManagementRoutes.post('/:id/deactivate', async (c) => {
     return c.json({ error: 'Cannot deactivate your own account' }, 400)
   }
 
-  const [updated] = await db
-    .update(user)
-    .set({ deactivatedAt: new Date(), updatedAt: new Date() })
-    .where(eq(user.id, id))
-    .returning()
-
+  const { users: updatedRows, tokensRevoked } = await db.transaction((tx) =>
+    deactivateUsers(tx, [id]),
+  )
+  const [updated] = updatedRows
   if (!updated) throw new NotFoundError('User')
+
   await deleteSessionsForUser(id)
-  const revoked = await revokeActiveMcpTokensForUser(id, 'user_deactivated')
-  return c.json({ user: updated, revoked })
+  emitMcpOAuthEvent('token_revoked', { userId: id, initiator: 'deactivation' })
+
+  return c.json({ user: updated, revoked: tokensRevoked })
 })
 
 // POST /api/users/:id/reactivate

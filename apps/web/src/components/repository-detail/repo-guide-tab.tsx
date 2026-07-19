@@ -16,9 +16,36 @@ type Props = {
   queue?: string | null
 }
 
-type GuideArea = RepositoryGuideSummary['areas'][number]
-type QuestionCard = RepositoryGuideSummary['questionCards'][number]
-type EvidenceTier = GuideArea['evidenceShare'][number]['tier']
+type BaseGuideArea = RepositoryGuideSummary['areas'][number]
+type EvidenceTier = BaseGuideArea['evidenceShare'][number]['tier']
+type EvidenceLabel = RepositoryGuideSummary['questionStarters'][number]['evidenceLabels'][number]
+type GuideArea = BaseGuideArea & {
+  pathHint?: string | null
+}
+type QuestionCard = {
+  alignment: 'ok' | 'stale' | 'conflict'
+  confidence: number
+  primaryTier: EvidenceTier
+  question: string
+  rationale: string
+  route: string
+  sources: Array<{
+    count: number
+    label: string
+    tier: EvidenceTier
+  }>
+}
+type GuideWithDesignFields = RepositoryGuideSummary & {
+  areas: GuideArea[]
+  questionCards?: QuestionCard[]
+}
+
+const EVIDENCE_LABEL_TIERS: Record<EvidenceLabel, EvidenceTier> = {
+  Code: 'A',
+  Tests: 'B',
+  Docs: 'C',
+  'Design/History': 'D',
+}
 
 const TIER_LABELS: Record<EvidenceTier, string> = {
   A: 'Code',
@@ -33,6 +60,14 @@ const ALIGNMENT_LABELS: Record<QuestionCard['alignment'], string> = {
   conflict: 'Conflicting',
 }
 
+const CONFIDENCE_SCORES: Record<GuideArea['confidenceLabel'], number> = {
+  'Very strong': 5,
+  Strong: 4,
+  'Mixed with docs': 3,
+  'Gated history': 2,
+  Limited: 1,
+}
+
 const CONFIDENCE_TONES: Record<GuideArea['confidenceLabel'], string> = {
   'Very strong':
     'border-[var(--convergekit-align-ok-bd)]/25 bg-[var(--convergekit-align-ok-bg)] text-[var(--convergekit-align-ok-fg)]',
@@ -42,8 +77,7 @@ const CONFIDENCE_TONES: Record<GuideArea['confidenceLabel'], string> = {
     'border-[var(--convergekit-auth-c-bd)]/25 bg-[var(--convergekit-auth-c-bg)] text-[var(--convergekit-auth-c-fg)]',
   'Gated history':
     'border-[var(--convergekit-align-stale-bd)]/25 bg-[var(--convergekit-align-stale-bg)] text-[var(--convergekit-align-stale-fg)]',
-  Limited:
-    'border-[var(--convergekit-line)] bg-[var(--convergekit-bg-3)] text-[var(--convergekit-ink-3)]',
+  Limited: 'border-[var(--convergekit-line)] bg-[var(--convergekit-bg-3)] text-[var(--convergekit-ink-3)]',
 }
 
 export function RepoGuideTab({ repositoryId, status }: Props) {
@@ -126,6 +160,8 @@ export function RepoGuideTab({ repositoryId, status }: Props) {
     return <GuideLoading title={t('preparingTitle')} description={t('preparingDescription')} />
   }
 
+  const designGuide = guide as GuideWithDesignFields
+
   return (
     <div className="flex h-full min-h-[min(720px,calc(100vh-18rem))] w-full flex-col gap-3.5 py-5">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -169,8 +205,8 @@ export function RepoGuideTab({ repositoryId, status }: Props) {
         className="grid h-[min(680px,calc(100vh-20rem))] min-h-[520px] min-w-0 grid-cols-1 gap-3.5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
         style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 34rem), 1fr))' }}
       >
-        <CurrentRepoGuide guide={guide} showComputingHint={viewState === 'computing-areas'} />
-        <ProposedRepoGuide cards={guide.questionCards} />
+        <CurrentRepoGuide guide={designGuide} showComputingHint={viewState === 'computing-areas'} />
+        <ProposedRepoGuide cards={getQuestionCardsForGuide(designGuide)} />
       </div>
 
       <div className="flex items-start gap-3 rounded-[var(--convergekit-radius-lg)] border border-[var(--convergekit-line)] bg-white px-4 py-3 text-[13px] leading-5 text-[var(--convergekit-ink-2)] shadow-sm">
@@ -201,7 +237,7 @@ function CurrentRepoGuide({
   guide,
   showComputingHint,
 }: {
-  guide: RepositoryGuideSummary
+  guide: GuideWithDesignFields
   showComputingHint: boolean
 }) {
   return (
@@ -245,6 +281,7 @@ function CurrentRepoGuide({
 
 function AreaCoverageRow({ area }: { area: GuideArea }) {
   const shares = area.evidenceShare.filter((share) => share.fileCount > 0)
+  const pathHint = area.pathHint ?? area.primaryQuestionIntents.join(' / ')
 
   return (
     <div>
@@ -254,7 +291,7 @@ function AreaCoverageRow({ area }: { area: GuideArea }) {
             {area.name}
           </div>
           <div className="truncate font-mono text-[11px] text-[var(--convergekit-ink-4)]">
-            {area.pathHint ?? 'path unavailable'}
+            {pathHint || 'path unavailable'}
           </div>
         </div>
         <span
@@ -282,6 +319,36 @@ function AreaCoverageRow({ area }: { area: GuideArea }) {
       </div>
     </div>
   )
+}
+
+function getQuestionCardsForGuide(guide: GuideWithDesignFields): QuestionCard[] {
+  if (guide.questionCards?.length) return guide.questionCards
+
+  return guide.questionStarters.map((starter) => {
+    const matchedArea = starter.generatedFromArea
+      ? guide.areas.find((area) => area.name === starter.generatedFromArea)
+      : guide.areas[0]
+    const confidence = matchedArea ? CONFIDENCE_SCORES[matchedArea.confidenceLabel] : 2
+    const primaryTier = EVIDENCE_LABEL_TIERS[starter.evidenceLabels[0] ?? 'Code']
+    const route = starter.evidenceLabels.join(' + ')
+
+    return {
+      alignment:
+        confidence <= 1 ? 'conflict' : primaryTier === 'D' || confidence <= 2 ? 'stale' : 'ok',
+      confidence,
+      primaryTier,
+      question: starter.examplePrompt,
+      rationale: matchedArea
+        ? `${matchedArea.name} is the strongest current area for ${starter.title.toLowerCase()} questions.`
+        : starter.title,
+      route,
+      sources: starter.evidenceLabels.map((label) => ({
+        count: 1,
+        label,
+        tier: EVIDENCE_LABEL_TIERS[label],
+      })),
+    }
+  })
 }
 
 function ProposedRepoGuide({ cards }: { cards: QuestionCard[] }) {

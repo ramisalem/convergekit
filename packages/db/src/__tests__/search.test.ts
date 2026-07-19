@@ -1,5 +1,5 @@
 /**
- * Search integration tests
+ * Search integration tests — JDW-42
  *
  * Unit tests (classifyQuery) run always.
  * Integration tests (searchChunksKeyword, searchChunks) require a PostgreSQL

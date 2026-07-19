@@ -26,6 +26,57 @@ export const embeddingCompatibilitySchema = z.object({
   message: z.string().nullable(),
 })
 
+export const repositoryIndexingFailureSchema = z.object({
+  message: z.string(),
+})
+
+export const repositoryListSummarySchema = z.object({
+  chatCount: z.number().int().nonnegative(),
+  indexedAt: z.string().datetime().nullable(),
+  loc: z.number().int().nonnegative(),
+  primaryLanguage: z.string().nullable(),
+})
+
+export const incrementalIndexingSummarySchema = z.object({
+  enabled: z.boolean(),
+  status: z.enum([
+    'not_checked',
+    'active',
+    'fresh',
+    'changes_indexed',
+    'failed',
+    'paused',
+    'needs_reindex',
+  ]),
+  lastCheckedAt: z.string().datetime().nullable(),
+  nextCheckAt: z.string().datetime().nullable(),
+  activeRun: z
+    .object({
+      id: z.string(),
+      jobId: z.string().nullable(),
+      status: z.enum(['checking', 'queued', 'processing']),
+      startedAt: z.string().datetime().nullable(),
+    })
+    .nullable(),
+  lastRun: z
+    .object({
+      id: z.string(),
+      status: z.enum(['completed', 'completed_noop', 'failed', 'skipped']),
+      trigger: z.enum(['scheduled', 'manual', 'full_reindex']),
+      fromCommit: z.string().nullable(),
+      toCommit: z.string().nullable(),
+      changedFileCount: z.number().int().nonnegative(),
+      deletedFileCount: z.number().int().nonnegative(),
+      skippedFileCount: z.number().int().nonnegative(),
+      chunkCount: z.number().int().nonnegative(),
+      failureReason: z.string().nullable(),
+      finishedAt: z.string().datetime().nullable(),
+    })
+    .nullable(),
+})
+
+export type IncrementalIndexingSummary = z.infer<typeof incrementalIndexingSummarySchema>
+
 export const repositoryResponseSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
@@ -38,14 +89,11 @@ export const repositoryResponseSchema = z.object({
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   indexedAt: z.string().datetime().nullable().optional(),
-  listSummary: z.object({
-    primaryLanguage: z.string().nullable(),
-    loc: z.number().int().nonnegative().nullable(),
-    chatCount: z.number().int().nonnegative(),
-    indexedAt: z.string().datetime().nullable(),
-  }).optional(),
   embeddingProfile: embeddingProfileSchema.nullable().optional(),
   embeddingCompatibility: embeddingCompatibilitySchema.nullable().optional(),
+  indexingFailure: repositoryIndexingFailureSchema.nullable().optional(),
+  listSummary: repositoryListSummarySchema.optional(),
+  incrementalIndexing: incrementalIndexingSummarySchema.optional(),
 })
 
 export type RepositoryResponse = z.infer<typeof repositoryResponseSchema>
@@ -88,7 +136,6 @@ export const repositoryGuideSummarySchema = z.object({
         'Gated history',
         'Limited',
       ]),
-      pathHint: z.string().nullable(),
       evidenceShare: z.array(
         z.object({
           tier: evidenceTierSchema,
@@ -106,26 +153,6 @@ export const repositoryGuideSummarySchema = z.object({
       evidenceLabels: z.array(evidenceLabelSchema),
       examplePrompt: z.string(),
       generatedFromArea: z.string().optional(),
-    }),
-  ),
-  questionCards: z.array(
-    z.object({
-      intent: retrievalIntentSchema,
-      question: z.string(),
-      confidence: z.number().int().min(1).max(5),
-      route: z.string(),
-      primaryTier: evidenceTierSchema,
-      secondaryTier: evidenceTierSchema.nullable(),
-      rationale: z.string(),
-      alignment: z.enum(['ok', 'stale', 'conflict']),
-      generatedFromArea: z.string(),
-      sources: z.array(
-        z.object({
-          tier: evidenceTierSchema,
-          label: z.string(),
-          count: z.number().int().positive(),
-        }),
-      ),
     }),
   ),
   skippedSummary: z.array(

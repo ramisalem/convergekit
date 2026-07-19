@@ -1,5 +1,13 @@
 import { getApiBaseUrl } from '@/lib/runtime-urls'
-import type { CreateRepositoryInput, RepositoryGuideSummary, RepositoryResponse } from '@convergekit/types'
+import type {
+  AnalyticsWindow,
+  CreateRepositoryInput,
+  HealthResponse,
+  KpiResponse,
+  RepositoryGuideSummary,
+  RepositoryResponse,
+  UtilizationResponse,
+} from '@convergekit/types'
 
 const API_URL = getApiBaseUrl()
 
@@ -57,6 +65,7 @@ export type CurrentUserResponse = {
     image?: string | null
     role: 'admin' | 'user'
     groupId: string | null
+    ciTokensEnabled: boolean
   }
   supportContacts: SupportContact[]
 }
@@ -64,6 +73,47 @@ export type CurrentUserResponse = {
 export const meApi = {
   get(): Promise<CurrentUserResponse> {
     return apiFetch('/api/me')
+  },
+}
+
+// ─── Connected agents (OAuth) ─────────────────────────────────────────────────
+
+export type ConnectedAgent = {
+  clientId: string
+  clientName: string
+  createdAt: string
+  lastUsedAt: string | null
+}
+
+export const connectedAgentsApi = {
+  list(): Promise<{ agents: ConnectedAgent[] }> {
+    return apiFetch('/api/me/connected-agents')
+  },
+  revoke(clientId: string): Promise<{ revoked: number }> {
+    return apiFetch(`/api/me/connected-agents/${encodeURIComponent(clientId)}`, {
+      method: 'DELETE',
+    })
+  },
+}
+
+// ─── MCP OAuth consent ────────────────────────────────────────────────────────
+
+export type McpConsentDisplay = {
+  clientName: string
+  scopes: string[]
+  repositoryCount: number
+  user: { name: string; email: string }
+}
+
+export const mcpOAuthApi = {
+  getConsent(request: string): Promise<McpConsentDisplay> {
+    return apiFetch(`/api/mcp-oauth/consent?request=${encodeURIComponent(request)}`)
+  },
+  decideConsent(request: string, decision: 'approve' | 'deny'): Promise<{ redirectUri: string }> {
+    return apiFetch('/api/mcp-oauth/consent', {
+      method: 'POST',
+      body: JSON.stringify({ request, decision }),
+    })
   },
 }
 
@@ -83,6 +133,93 @@ export type GitHubRepo = {
   defaultBranch: string
   description: string | null
 }
+
+export const githubApi = {
+  listRepos(): Promise<{
+    repos: GitHubRepo[]
+    requiresReconnect?: boolean
+    warning?: string | null
+  }> {
+    return apiFetch('/api/repositories/github-repos')
+  },
+}
+
+// ─── Repositories ─────────────────────────────────────────────────────────────
+
+export type { IncrementalIndexingSummary } from '@/components/repository-detail/incremental-freshness'
+
+export type IndexingRunResponse = {
+  id: string
+  kind: 'full' | 'incremental'
+  trigger: 'scheduled' | 'manual' | 'full_reindex'
+  status: string
+  fromCommit: string | null
+  toCommit: string | null
+  changedFileCount: number
+  deletedFileCount: number
+  skippedFileCount: number
+  chunkCount: number
+  failureReason: string | null
+  failureCode: string | null
+  startedAt: string | null
+  finishedAt: string | null
+  createdAt: string
+  durationMs: number | null
+}
+
+export const repositoriesApi = {
+  list(): Promise<{ repositories: RepositoryResponse[] }> {
+    return apiFetch('/api/repositories')
+  },
+
+  get(id: string): Promise<{ repository: RepositoryResponse }> {
+    return apiFetch(`/api/repositories/${id}`)
+  },
+
+  getGuide(id: string): Promise<{ guide: RepositoryGuideSummary }> {
+    return apiFetch(`/api/repositories/${id}/guide`)
+  },
+
+  create(input: CreateRepositoryInput): Promise<{ repositoryId: string; jobId: string }> {
+    return apiFetch('/api/repositories', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+  },
+
+  delete(id: string): Promise<void> {
+    return apiFetch(`/api/repositories/${id}`, { method: 'DELETE' })
+  },
+
+  reindex(id: string): Promise<{ jobId: string }> {
+    return apiFetch(`/api/repositories/${id}/reindex`, { method: 'POST' })
+  },
+
+  regenerateWiki(id: string): Promise<{ jobId: string; queue?: string }> {
+    return apiFetch(`/api/repositories/${id}/regenerate-wiki`, { method: 'POST' })
+  },
+
+  checkIncrementalNow(id: string): Promise<{ outcome: string; incrementalIndexing: unknown }> {
+    return apiFetch(`/api/repositories/${id}/incremental-indexing/check-now`, { method: 'POST' })
+  },
+
+  pauseIncremental(id: string): Promise<{ incrementalIndexing: unknown }> {
+    return apiFetch(`/api/repositories/${id}/incremental-indexing/pause`, { method: 'POST' })
+  },
+
+  resumeIncremental(id: string): Promise<{ incrementalIndexing: unknown }> {
+    return apiFetch(`/api/repositories/${id}/incremental-indexing/resume`, { method: 'POST' })
+  },
+
+  listIncrementalRuns(id: string, limit = 10): Promise<{ runs: IndexingRunResponse[] }> {
+    return apiFetch(`/api/repositories/${id}/incremental-indexing/runs?limit=${limit}`)
+  },
+}
+
+// ─── CI / automation tokens — self-service (/api/me/ci-tokens) ───────────────
+// Every route scopes to the caller's own tokens: create, renew, and connection
+// testing are self-service only (gated server-side on the caller's
+// ciTokensEnabled capability flag) and therefore live here, not on the admin client.
 
 export type McpServerConfig = {
   mcpServers: Record<
@@ -166,6 +303,20 @@ export type McpTokenListItem = {
   alertCount: number
 }
 
+// Legacy (grandfathered) repo-scoped tokens: same base fields as McpTokenListItem
+// plus the repository they're pinned to. `owner` is only present on admin oversight
+// rows (the self-service /api/me list never joins it in — every row is the caller's
+// own); `repository.deletedAt` is only present on admin rows too, so oversight can
+// flag active tokens on soft-deleted repos.
+export type LegacyCiTokenListItem = Omit<McpTokenListItem, 'owner'> & {
+  owner?: McpTokenOwnerOption
+  repository: {
+    id: string
+    name: string
+    deletedAt?: string | null
+  }
+}
+
 export type McpTokenAuditEvent = {
   id: string
   tokenId: string | null
@@ -189,7 +340,7 @@ export type McpTokenAuditEvent = {
 export type McpTokenAlert = {
   id: string
   tokenId: string
-  repositoryId: string
+  repositoryId: string | null
   userId: string
   kind: string
   message: string
@@ -200,121 +351,110 @@ export type McpTokenAlert = {
   acknowledgedAt: string | null
 }
 
-export const githubApi = {
-  listRepos(): Promise<{
-    repos: GitHubRepo[]
-    requiresReconnect?: boolean
-    warning?: string | null
-  }> {
-    return apiFetch('/api/repositories/github-repos')
-  },
-}
-
-// ─── Repositories ─────────────────────────────────────────────────────────────
-
-export const repositoriesApi = {
-  list(): Promise<{ repositories: RepositoryResponse[] }> {
-    return apiFetch('/api/repositories')
+export const meCiTokensApi = {
+  list(): Promise<{ tokens: McpTokenListItem[] }> {
+    return apiFetch('/api/me/ci-tokens')
   },
 
-  get(id: string): Promise<{ repository: RepositoryResponse }> {
-    return apiFetch(`/api/repositories/${id}`)
+  create(input: {
+    label: string
+    expiresInDays: 7 | 30 | 90
+    scopes: McpScope[]
+  }): Promise<McpTokenConfig & { token: string; tokenDetails: McpTokenListItem }> {
+    return apiFetch('/api/me/ci-tokens', { method: 'POST', body: JSON.stringify(input) })
   },
 
-  getGuide(id: string): Promise<{ guide: RepositoryGuideSummary }> {
-    return apiFetch(`/api/repositories/${id}/guide`)
-  },
-
-  create(input: CreateRepositoryInput): Promise<{ repositoryId: string; jobId: string }> {
-    return apiFetch('/api/repositories', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    })
-  },
-
-  delete(id: string): Promise<void> {
-    return apiFetch(`/api/repositories/${id}`, { method: 'DELETE' })
-  },
-
-  reindex(id: string): Promise<{ jobId: string }> {
-    return apiFetch(`/api/repositories/${id}/reindex`, { method: 'POST' })
-  },
-
-  regenerateWiki(id: string): Promise<{ jobId: string; queue?: string }> {
-    return apiFetch(`/api/repositories/${id}/regenerate-wiki`, { method: 'POST' })
-  },
-
-  // MCP tokens
-  listMcpTokens(
-    repositoryId: string,
-    filters: { ownerUserId?: string | null } = {},
-  ): Promise<{ tokens: McpTokenListItem[]; ownerOptions: McpTokenOwnerOption[] }> {
-    const params = new URLSearchParams()
-    if (filters.ownerUserId) params.set('userId', filters.ownerUserId)
-    const query = params.toString()
-    return apiFetch(`/api/repositories/${repositoryId}/mcp-tokens${query ? `?${query}` : ''}`)
-  },
-
-  createMcpToken(
-    repositoryId: string,
-    input: { label: string; expiresInDays: 7 | 30 | 90; scopes: McpScope[] },
-  ): Promise<McpTokenConfig & { token: string; tokenDetails: McpTokenListItem }> {
-    return apiFetch(`/api/repositories/${repositoryId}/mcp-tokens`, {
-      method: 'POST',
-      body: JSON.stringify(input),
-    })
-  },
-
-  renewMcpToken(
-    repositoryId: string,
+  renew(
     tokenId: string,
   ): Promise<McpTokenConfig & { token: string; tokenDetails: McpTokenListItem }> {
-    return apiFetch(`/api/repositories/${repositoryId}/mcp-tokens/${tokenId}/renew`, {
+    return apiFetch(`/api/me/ci-tokens/${tokenId}/renew`, { method: 'POST' })
+  },
+
+  revoke(tokenId: string): Promise<void> {
+    return apiFetch(`/api/me/ci-tokens/${tokenId}`, { method: 'DELETE' })
+  },
+
+  getConfig(tokenId: string): Promise<McpTokenConfig> {
+    return apiFetch(`/api/me/ci-tokens/${tokenId}/config`)
+  },
+
+  listAudit(tokenId: string): Promise<{ events: McpTokenAuditEvent[] }> {
+    return apiFetch(`/api/me/ci-tokens/${tokenId}/audit`)
+  },
+
+  listAlerts(tokenId: string): Promise<{ alerts: McpTokenAlert[] }> {
+    return apiFetch(`/api/me/ci-tokens/${tokenId}/alerts`)
+  },
+
+  acknowledgeAlert(tokenId: string, alertId: string): Promise<{ alert: McpTokenAlert }> {
+    return apiFetch(`/api/me/ci-tokens/${tokenId}/alerts/${alertId}/acknowledge`, {
       method: 'POST',
     })
   },
 
-  deleteMcpToken(repositoryId: string, tokenId: string): Promise<void> {
-    return apiFetch(`/api/repositories/${repositoryId}/mcp-tokens/${tokenId}`, {
-      method: 'DELETE',
-    })
-  },
-
-  getMcpConfig(repositoryId: string, tokenId: string): Promise<McpTokenConfig> {
-    return apiFetch(`/api/repositories/${repositoryId}/mcp-tokens/${tokenId}/config`)
-  },
-
-  listMcpTokenAudit(
-    repositoryId: string,
-    tokenId: string,
-  ): Promise<{ events: McpTokenAuditEvent[] }> {
-    return apiFetch(`/api/repositories/${repositoryId}/mcp-tokens/${tokenId}/audit`)
-  },
-
-  listMcpTokenAlerts(repositoryId: string, tokenId: string): Promise<{ alerts: McpTokenAlert[] }> {
-    return apiFetch(`/api/repositories/${repositoryId}/mcp-tokens/${tokenId}/alerts`)
-  },
-
-  acknowledgeMcpTokenAlert(
-    repositoryId: string,
-    tokenId: string,
-    alertId: string,
-  ): Promise<{ alert: McpTokenAlert }> {
-    return apiFetch(
-      `/api/repositories/${repositoryId}/mcp-tokens/${tokenId}/alerts/${alertId}/acknowledge`,
-      { method: 'POST' },
-    )
-  },
-
-  testMcpConnection(
-    repositoryId: string,
-    tokenId: string,
-    token?: string,
-  ): Promise<McpConnectionTestResult> {
-    return apiFetch(`/api/repositories/${repositoryId}/mcp-tokens/${tokenId}/test`, {
+  testConnection(tokenId: string, token?: string): Promise<McpConnectionTestResult> {
+    return apiFetch(`/api/me/ci-tokens/${tokenId}/test`, {
       method: 'POST',
       body: JSON.stringify(token ? { token } : {}),
     })
+  },
+
+  listLegacy(): Promise<{ tokens: LegacyCiTokenListItem[] }> {
+    return apiFetch('/api/me/ci-tokens/legacy')
+  },
+
+  revokeLegacy(tokenId: string): Promise<void> {
+    return apiFetch(`/api/me/ci-tokens/legacy/${tokenId}`, { method: 'DELETE' })
+  },
+}
+
+// ─── CI / automation tokens — admin oversight (/api/admin/ci-tokens) ─────────
+// Oversight-only: list/inspect/revoke across every user's tokens (both shapes),
+// but no create/renew/test — minting and rotation are self-service, even for an
+// admin acting on their own token (see meCiTokensApi above).
+
+// The admin oversight legacy list always joins owner + repository.deletedAt (see
+// ci-tokens.ts's GET /legacy) — narrower than the self-service LegacyCiTokenListItem,
+// which leaves both optional. Typing them as required here saves optional-chaining
+// on every admin row, since the oversight dashboard renders both unconditionally.
+export type AdminLegacyCiTokenListItem = LegacyCiTokenListItem & {
+  owner: McpTokenOwnerOption
+  repository: LegacyCiTokenListItem['repository'] & { deletedAt: string | null }
+}
+
+export const adminCiTokensApi = {
+  list(): Promise<{ tokens: McpTokenListItem[] }> {
+    return apiFetch('/api/admin/ci-tokens')
+  },
+
+  revoke(tokenId: string): Promise<void> {
+    return apiFetch(`/api/admin/ci-tokens/${tokenId}`, { method: 'DELETE' })
+  },
+
+  getConfig(tokenId: string): Promise<McpTokenConfig> {
+    return apiFetch(`/api/admin/ci-tokens/${tokenId}/config`)
+  },
+
+  listAudit(tokenId: string): Promise<{ events: McpTokenAuditEvent[] }> {
+    return apiFetch(`/api/admin/ci-tokens/${tokenId}/audit`)
+  },
+
+  listAlerts(tokenId: string): Promise<{ alerts: McpTokenAlert[] }> {
+    return apiFetch(`/api/admin/ci-tokens/${tokenId}/alerts`)
+  },
+
+  acknowledgeAlert(tokenId: string, alertId: string): Promise<{ alert: McpTokenAlert }> {
+    return apiFetch(`/api/admin/ci-tokens/${tokenId}/alerts/${alertId}/acknowledge`, {
+      method: 'POST',
+    })
+  },
+
+  listLegacy(): Promise<{ tokens: AdminLegacyCiTokenListItem[] }> {
+    return apiFetch('/api/admin/ci-tokens/legacy')
+  },
+
+  revokeLegacy(tokenId: string): Promise<void> {
+    return apiFetch(`/api/admin/ci-tokens/legacy/${tokenId}`, { method: 'DELETE' })
   },
 }
 
@@ -599,6 +739,7 @@ export type ManagedUser = {
   groupId: string | null
   createdAt: string
   deactivatedAt: string | null
+  ciTokensEnabled: boolean
   pendingInvite: boolean
 }
 
@@ -626,6 +767,7 @@ export const usersApi = {
       name?: string
       groupId?: string | null
       role?: 'admin' | 'user'
+      ciTokensEnabled?: boolean
     },
   ): Promise<{ user: ManagedUser }> {
     return apiFetch(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(input) })
@@ -690,4 +832,21 @@ export async function fetchRepositories() {
 
 export async function fetchRepository(id: string) {
   return repositoriesApi.get(id)
+}
+
+export function fetchRepositoryDetailRecord(id: string) {
+  return repositoriesApi.get(id).then(({ repository }) => repository)
+}
+
+// ─── Admin analytics ───────────────────────────────────────────────────────
+export const analyticsApi = {
+  kpis(window: AnalyticsWindow): Promise<KpiResponse> {
+    return apiFetch(`/api/admin/analytics/kpis?window=${window}`)
+  },
+  health(window: AnalyticsWindow): Promise<HealthResponse> {
+    return apiFetch(`/api/admin/analytics/health?window=${window}`)
+  },
+  utilization(window: AnalyticsWindow): Promise<UtilizationResponse> {
+    return apiFetch(`/api/admin/analytics/utilization?window=${window}`)
+  },
 }

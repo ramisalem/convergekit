@@ -36,6 +36,9 @@ export interface IncrementalJobData {
   branchId: string
   fromCommit: string
   toCommit: string
+  /** Set for runs created via the new run model; absent for legacy jobs. */
+  runId?: string
+  trigger?: 'scheduled' | 'manual'
 }
 
 export interface TranslationJobData {

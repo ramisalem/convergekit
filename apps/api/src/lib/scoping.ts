@@ -2,6 +2,7 @@ import { isAllowedAccessPolicyRepository } from '@convergekit/config/access-poli
 import { db, groupRepositories, repositories, user } from '@convergekit/db'
 import { and, eq, isNull } from 'drizzle-orm'
 import { ForbiddenError, NotFoundError } from '../errors.js'
+import type { Executor } from './db-executor.js'
 
 function filterAllowedRepositories<
   T extends { id?: string; repositoryId?: string; provider?: string; cloneUrl?: string },
@@ -21,8 +22,11 @@ function filterAllowedRepositories<
  * - Users: repositories assigned to their group via groupRepositories.
  * - Users with no group: empty set (no access).
  */
-export async function scopedRepositoryIds(userId: string): Promise<Set<string>> {
-  const dbUser = await db
+export async function scopedRepositoryIds(
+  userId: string,
+  executor: Executor = db,
+): Promise<Set<string>> {
+  const dbUser = await executor
     .select({ role: user.role, groupId: user.groupId, deactivatedAt: user.deactivatedAt })
     .from(user)
     .where(eq(user.id, userId))
@@ -34,7 +38,7 @@ export async function scopedRepositoryIds(userId: string): Promise<Set<string>> 
   if (deactivatedAt) return new Set()
 
   if (role === 'admin') {
-    const repos = await db
+    const repos = await executor
       .select({
         id: repositories.id,
         provider: repositories.provider,
@@ -48,7 +52,7 @@ export async function scopedRepositoryIds(userId: string): Promise<Set<string>> 
   // Regular user — scope to group repos
   if (!groupId) return new Set()
 
-  const repos = await db
+  const repos = await executor
     .select({
       repositoryId: groupRepositories.repositoryId,
       provider: repositories.provider,

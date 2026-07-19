@@ -213,6 +213,7 @@ export function UsersPanel({ currentUserId }: { currentUserId: string | null }) 
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Group</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">CI tokens</th>
               <th className="w-10 px-4 py-3"></th>
             </tr>
           </thead>
@@ -275,6 +276,17 @@ export function UsersPanel({ currentUserId }: { currentUserId: string | null }) 
                       }`}
                     >
                       {u.deactivatedAt ? 'Deactivated' : u.pendingInvite ? 'Pending' : 'Active'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                        u.ciTokensEnabled
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-neutral-100 text-neutral-700'
+                      }`}
+                    >
+                      {u.ciTokensEnabled ? 'Enabled' : 'Disabled'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">

@@ -15,7 +15,7 @@ export function normalizeRepositoryTab(value: string | null): RepositoryTab {
   ) {
     return value
   }
-  return 'guide'
+  return 'chat'
 }
 
 export function getAvailableRepositoryTabs(isAdmin: boolean): VisibleRepositoryTab[] {

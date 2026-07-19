@@ -1,5 +1,5 @@
 import { db, mcpTokens, repositories, user as users } from '@convergekit/db'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import type { MiddlewareHandler } from 'hono'
 import { UnauthorizedError } from '../errors.js'
 import { hashMcpToken } from '../lib/mcp-token-policy.js'
@@ -12,21 +12,21 @@ import {
 import { checkRateLimit } from '../lib/rate-limit.js'
 import { scopedRepositoryIds } from '../lib/scoping.js'
 
-// Extend context to carry the repositoryId scoped by the MCP token
 declare module 'hono' {
   interface ContextVariableMap {
-    mcpRepositoryId: string
     mcpToken: McpTokenContext
   }
 }
 
 /**
- * Validates the Bearer token on /api/mcp/* routes — JDW-48
+ * Validates the Bearer token on /api/mcp/* routes.
  *
- * Extracts the Bearer token from the Authorization header, computes its
- * SHA-256 hash, and looks it up in mcp_tokens. On a match the token's
- * lastUsedAt is updated and the scoped repositoryId is set in context.
- * Missing or unrecognised tokens return 401.
+ * Two static-token shapes:
+ *  - user-level (repository_id NULL): owner active + user.ci_tokens_enabled.
+ *  - grandfathered per-repo (repository_id set): owner active + repo not deleted +
+ *    live repo-access (scopedRepositoryIds). No new per-repo tokens are created.
+ *
+ * Only mount behind requireMcpCredential (it converts these messages to a uniform 401).
  */
 export const requireMcpToken: MiddlewareHandler = async (c, next) => {
   const authorization = c.req.header('Authorization')
@@ -42,12 +42,13 @@ export const requireMcpToken: MiddlewareHandler = async (c, next) => {
     .select({
       token: mcpTokens,
       userDeactivatedAt: users.deactivatedAt,
+      userCiEnabled: users.ciTokensEnabled,
       repositoryDeletedAt: repositories.deletedAt,
     })
     .from(mcpTokens)
     .innerJoin(users, eq(mcpTokens.userId, users.id))
-    .innerJoin(repositories, eq(mcpTokens.repositoryId, repositories.id))
-    .where(and(eq(mcpTokens.tokenHash, tokenHash)))
+    .leftJoin(repositories, eq(mcpTokens.repositoryId, repositories.id))
+    .where(eq(mcpTokens.tokenHash, tokenHash))
     .limit(1)
 
   if (!row) {
@@ -69,13 +70,21 @@ export const requireMcpToken: MiddlewareHandler = async (c, next) => {
     throw new UnauthorizedError('MCP token user is deactivated')
   }
 
-  if (row.repositoryDeletedAt) {
-    throw new UnauthorizedError('MCP token repository was deleted')
-  }
+  if (mcpToken.repositoryId === null) {
+    // User-level CI token: gated by the owner's capability flag.
+    if (row.userCiEnabled !== true) {
+      throw new UnauthorizedError('MCP token capability is disabled')
+    }
+  } else {
+    // Grandfathered per-repo token: owner must still have live access to the repo.
+    if (row.repositoryDeletedAt) {
+      throw new UnauthorizedError('MCP token repository was deleted')
+    }
 
-  const allowed = await scopedRepositoryIds(mcpToken.userId)
-  if (!allowed.has(mcpToken.repositoryId)) {
-    throw new UnauthorizedError('MCP token no longer has repository access')
+    const allowed = await scopedRepositoryIds(mcpToken.userId)
+    if (!allowed.has(mcpToken.repositoryId)) {
+      throw new UnauthorizedError('MCP token no longer has repository access')
+    }
   }
 
   const tokenContext: McpTokenContext = {
@@ -94,7 +103,7 @@ export const requireMcpToken: MiddlewareHandler = async (c, next) => {
   const limits = [
     await checkRateLimit(mcpToken.id, 'mcp-token'),
     await checkRateLimit(mcpToken.userId, 'mcp-user'),
-    await checkRateLimit(mcpToken.repositoryId, 'mcp-repo'),
+    ...(mcpToken.repositoryId ? [await checkRateLimit(mcpToken.repositoryId, 'mcp-repo')] : []),
   ]
   const denied = limits.find((limit) => !limit.allowed)
   if (denied) {
@@ -119,7 +128,6 @@ export const requireMcpToken: MiddlewareHandler = async (c, next) => {
     })
   }
 
-  c.set('mcpRepositoryId', mcpToken.repositoryId)
   c.set('mcpToken', tokenContext)
 
   return next()

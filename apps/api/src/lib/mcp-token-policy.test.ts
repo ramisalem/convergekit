@@ -34,6 +34,14 @@ describe('MCP token policy', () => {
     expect(() => normalizeMcpScopes(['repo:write'])).toThrow('Unsupported MCP token scope')
   })
 
+  it('normalizeMcpScopes defaults omitted scopes to all scopes', () => {
+    expect(normalizeMcpScopes(undefined)).toEqual(['repo:read', 'docs:search', 'files:read'])
+  })
+
+  it('normalizeMcpScopes preserves an explicit empty array', () => {
+    expect(normalizeMcpScopes([])).toEqual([])
+  })
+
   it('generates a non-raw fingerprint from the token hash', () => {
     const { rawToken, tokenHash } = createMcpTokenSecret()
     const fingerprint = fingerprintMcpTokenHash(tokenHash)

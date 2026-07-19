@@ -48,7 +48,7 @@ export function resolveMcpTokenExpiry(days: number | undefined, now = new Date()
 }
 
 export function normalizeMcpScopes(scopes: string[] | undefined): McpScope[] {
-  if (!scopes || scopes.length === 0) return [...ALL_MCP_SCOPES]
+  if (!scopes) return [...ALL_MCP_SCOPES]
 
   const normalized: McpScope[] = []
   for (const scope of scopes) {
@@ -56,6 +56,14 @@ export function normalizeMcpScopes(scopes: string[] | undefined): McpScope[] {
     if (!normalized.includes(scope as McpScope)) normalized.push(scope as McpScope)
   }
   return normalized
+}
+
+export function filterMcpScopes(scopes: string[]): McpScope[] {
+  const out: McpScope[] = []
+  for (const scope of scopes) {
+    if (MCP_SCOPE_SET.has(scope) && !out.includes(scope as McpScope)) out.push(scope as McpScope)
+  }
+  return out
 }
 
 export function getMcpTokenStatus(
