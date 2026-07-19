@@ -1,6 +1,6 @@
 {
   "name": "@convergekit/api",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -27,10 +27,10 @@
     "@convergekit/types": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "ai": "^5.0.180",
-    "better-auth": "^1.6.9",
+    "better-auth": "^1.6.13",
     "bullmq": "^5.76.4",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.12.18",
+    "hono": "^4.12.25",
     "ioredis": "^5.4.2",
     "nanoid": "^5.1.9",
     "pino": "^9.6.0",
