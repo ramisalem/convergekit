@@ -16,7 +16,7 @@
     "@convergekit/db": "workspace:*",
     "@convergekit/types": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "zod": "^4.4.1"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",

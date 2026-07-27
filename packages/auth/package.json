@@ -16,11 +16,11 @@
     "@authenio/samlify-node-xmllint": "^2.0.0",
     "@convergekit/config": "workspace:*",
     "@convergekit/db": "workspace:*",
-    "better-auth": "^1.6.13",
+    "better-auth": "^1.6.25",
     "drizzle-orm": "^0.45.2",
-    "ioredis": "^5.4.2",
+    "ioredis": "^5.11.1",
     "samlify": "^2.13.0",
-    "zod": "^4.4.1"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",
