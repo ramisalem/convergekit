@@ -15,6 +15,12 @@
 :80 {
 	encode zstd gzip
 
+	# Container healthcheck target. Answered by Caddy directly so proxy health
+	# does not depend on the web app finishing its boot.
+	handle /healthz {
+		respond "ok" 200
+	}
+
 	# Next.js route handlers that live in the web app rather than the API.
 	handle /api/chat {
 		reverse_proxy {$CONVERGEKIT_WEB_UPSTREAM:web:3000}

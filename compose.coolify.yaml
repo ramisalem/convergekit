@@ -14,7 +14,12 @@ x-convergekit-node-dns: &convergekit-node-dns
 
 services:
   proxy:
-    image: caddy:2.8-alpine
+    # The Caddyfile is baked into the image rather than bind-mounted: Coolify
+    # runs `docker compose up` from a directory that contains only the compose
+    # file, so a relative host path would not exist. See docker/coolify/Dockerfile.
+    build:
+      context: .
+      dockerfile: docker/coolify/Dockerfile
     restart: unless-stopped
     depends_on:
       api:
@@ -26,10 +31,11 @@ services:
       SERVICE_FQDN_PROXY_80: /
       CONVERGEKIT_API_UPSTREAM: api:3001
       CONVERGEKIT_WEB_UPSTREAM: web:3000
-    volumes:
-      - ./docker/coolify/Caddyfile:/etc/caddy/Caddyfile:ro
     healthcheck:
-      test: ['CMD', 'wget', '--quiet', '--spider', 'http://127.0.0.1:80/']
+      # Checks that Caddy itself is serving on :80. Deliberately not routed to an
+      # upstream — web/api liveness is reported by their own containers, and a
+      # slow Next.js boot should not mark the proxy as failed.
+      test: ['CMD', 'wget', '--quiet', '--spider', 'http://127.0.0.1:80/healthz']
       interval: 15s
       timeout: 5s
       retries: 5
