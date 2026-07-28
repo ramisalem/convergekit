@@ -1,0 +1,46 @@
+{
+	# Coolify's Traefik terminates TLS and forwards plain HTTP to this container,
+	# so Caddy must not try to obtain its own certificates.
+	auto_https off
+
+	servers {
+		# Trust the upstream Coolify proxy so the X-Forwarded-* headers it sets
+		# (notably X-Forwarded-Proto: https) survive instead of being rewritten to
+		# the http scheme of the internal hop. The web app derives its public
+		# origin from these headers.
+		trusted_proxies static 0.0.0.0/0 ::/0
+	}
+}
+
+:80 {
+	encode zstd gzip
+
+	# Next.js route handlers that live in the web app rather than the API.
+	handle /api/chat {
+		reverse_proxy {$CONVERGEKIT_WEB_UPSTREAM:web:3000}
+	}
+
+	handle /api/sign-out {
+		reverse_proxy {$CONVERGEKIT_WEB_UPSTREAM:web:3000}
+	}
+
+	handle /api/notifications {
+		reverse_proxy {$CONVERGEKIT_WEB_UPSTREAM:web:3000}
+	}
+
+	handle /api/* {
+		reverse_proxy {$CONVERGEKIT_API_UPSTREAM:api:3001}
+	}
+
+	handle /.well-known/oauth-authorization-server {
+		reverse_proxy {$CONVERGEKIT_API_UPSTREAM:api:3001}
+	}
+
+	handle /.well-known/oauth-protected-resource {
+		reverse_proxy {$CONVERGEKIT_API_UPSTREAM:api:3001}
+	}
+
+	handle {
+		reverse_proxy {$CONVERGEKIT_WEB_UPSTREAM:web:3000}
+	}
+}

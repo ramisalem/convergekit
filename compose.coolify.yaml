@@ -1,0 +1,183 @@
+# ConvergeKit — Coolify deployment stack.
+#
+# Mirrors the production-like local stack (compose.yaml + compose.local.yaml)
+# with three deployment-specific changes:
+#   1. Coolify's Traefik terminates TLS, so the bundled Caddy proxy speaks plain
+#      HTTP on :80 and only that service is published (SERVICE_FQDN_PROXY_80).
+#   2. No host port bindings — Postgres and Redis stay on the internal network.
+#   3. Public URLs come from ${CONVERGEKIT_PUBLIC_URL} instead of the hardcoded
+#      convergekit-dev.local hostname.
+
+x-convergekit-node-dns: &convergekit-node-dns
+  - ${CONVERGEKIT_DNS_PRIMARY:-1.1.1.1}
+  - ${CONVERGEKIT_DNS_SECONDARY:-8.8.8.8}
+
+services:
+  proxy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+      web:
+        condition: service_started
+    environment:
+      # Publishes this service on the Coolify-managed domain and routes to :80.
+      SERVICE_FQDN_PROXY_80: /
+      CONVERGEKIT_API_UPSTREAM: api:3001
+      CONVERGEKIT_WEB_UPSTREAM: web:3000
+    volumes:
+      - ./docker/coolify/Caddyfile:/etc/caddy/Caddyfile:ro
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--spider', 'http://127.0.0.1:80/']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-convergekit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-convergekit}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-convergekit} -d ${POSTGRES_DB:-convergekit}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  db-migrate:
+    build:
+      context: .
+      dockerfile: packages/db/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-convergekit}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-convergekit}
+      # Required on a fresh database: manual migrations 0002-0014 create the
+      # baseline objects (wiki_pages, user_ai_settings, the user_role enum, the
+      # tsvector trigger) that the Drizzle journal does not. Without this,
+      # verifyProductionMigrationBaseline() throws and the stack never starts.
+      # Idempotent once the baseline exists — it then takes the verify path.
+      CONVERGEKIT_LOCAL_BOOTSTRAP_MANUAL_MIGRATIONS: 'true'
+    restart: 'no'
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    dns: *convergekit-node-dns
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-convergekit}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-convergekit}
+      REDIS_URL: redis://redis:6379
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
+      BETTER_AUTH_URL: ${CONVERGEKIT_PUBLIC_URL:?CONVERGEKIT_PUBLIC_URL is required}
+      API_BASE_URL: ${CONVERGEKIT_PUBLIC_URL}
+      WEB_APP_URL: ${CONVERGEKIT_PUBLIC_URL}
+      ALLOWED_ORIGINS: ${CONVERGEKIT_PUBLIC_URL}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-convergekit-placeholder-client-id}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-convergekit-placeholder-client-secret}
+      WORKFORCE_SSO_ENABLED: ${WORKFORCE_SSO_ENABLED:-false}
+      WORKFORCE_SSO_PROVIDER_LABEL: ${WORKFORCE_SSO_PROVIDER_LABEL:-Workforce SSO}
+      WORKFORCE_SAML_IDP_SSO_URL: ${WORKFORCE_SAML_IDP_SSO_URL:-}
+      WORKFORCE_SAML_IDP_ENTITY_ID: ${WORKFORCE_SAML_IDP_ENTITY_ID:-}
+      WORKFORCE_SAML_IDP_CERT: ${WORKFORCE_SAML_IDP_CERT:-}
+      WORKFORCE_SAML_SP_ENTITY_ID: ${WORKFORCE_SAML_SP_ENTITY_ID:-urn:convergekit:prod}
+      WORKFORCE_SAML_ACS_URL: ${WORKFORCE_SAML_ACS_URL:-}
+      WORKFORCE_SAML_START_URL: ${WORKFORCE_SAML_START_URL:-}
+      CONVERGEKIT_SESSION_TTL_DAYS: ${CONVERGEKIT_SESSION_TTL_DAYS:-14}
+      ACCESS_ALLOWED_EMAIL_DOMAIN: ${ACCESS_ALLOWED_EMAIL_DOMAIN:-}
+      ACCESS_ALLOWED_GITHUB_ORG: ${ACCESS_ALLOWED_GITHUB_ORG:-}
+      ACCESS_ALLOWED_REPOSITORY_HOST: ${ACCESS_ALLOWED_REPOSITORY_HOST:-github.com}
+      ACCESS_SUPPORT_ADMIN_EMAILS: ${ACCESS_SUPPORT_ADMIN_EMAILS:-}
+      AI_PROVIDER: ${AI_PROVIDER:-openrouter}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # NEXT_PUBLIC_* values are inlined into the client bundle at build time,
+        # so they must be passed as build args rather than runtime env.
+        NEXT_PUBLIC_API_URL: ${CONVERGEKIT_PUBLIC_URL}
+        NEXT_PUBLIC_WEB_URL: ${CONVERGEKIT_PUBLIC_URL}
+    restart: unless-stopped
+    dns: *convergekit-node-dns
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      SERVER_API_URL: http://api:3001
+      NEXT_PUBLIC_API_URL: ${CONVERGEKIT_PUBLIC_URL}
+      NEXT_PUBLIC_WEB_URL: ${CONVERGEKIT_PUBLIC_URL}
+      DISABLE_LOCAL_API_PROXY: 'true'
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
+    dns: *convergekit-node-dns
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-convergekit}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-convergekit}
+      REDIS_URL: redis://redis:6379
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      WORKSPACE_DIR: /workspace
+      MAX_INDEX_FILE_BYTES: ${MAX_INDEX_FILE_BYTES:-524288}
+      INDEX_CHUNK_BATCH_SIZE: ${INDEX_CHUNK_BATCH_SIZE:-64}
+      AI_PROVIDER: ${AI_PROVIDER:-openrouter}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - worker_workspace:/workspace
+
+volumes:
+  postgres_data:
+  redis_data:
+  worker_workspace:
