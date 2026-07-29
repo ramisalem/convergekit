@@ -62,6 +62,11 @@ export const env = createEnv({
     WORKSPACE_DIR: z.string().default('/tmp/convergekit-workspace'),
   },
   runtimeEnv: process.env,
+  // Compose passes optional vars as `${VAR:-}`, which sets them to an empty
+  // string rather than leaving them unset. Without this, `''` reaches zod and
+  // fails schemas like `z.string().min(1).optional()` or `.email().optional()`,
+  // taking the process down through onValidationError below.
+  emptyStringAsUndefined: true,
   onValidationError(error) {
     console.error('❌ Invalid environment variables:', error)
     process.exit(1)
