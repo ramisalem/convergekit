@@ -127,13 +127,17 @@ Local development mirrors production ingress shape: browser requests use the
 single web origin (`https://convergekit-dev.local/api/...`), and the reverse
 proxy routes `/api/*` to the API container.
 
-For Workforce SSO local SAML testing, configure the dev SAML app with:
+For Workforce SSO local SAML testing, configure the Authentik SAML provider
+with:
 
 ```text
 ACS URL:   https://convergekit-dev.local/api/auth/workforce-saml/acs
-Entity ID: urn:convergekit:dev
+Audience:  urn:convergekit:dev
 Start URL: https://convergekit-dev.local/en/auth/sign-in
 ```
+
+See [`docs/authentik-sso-setup.md`](docs/authentik-sso-setup.md) for the full
+Authentik walkthrough.
 
 To run the local smoke checks after starting the stack:
 
@@ -224,6 +228,14 @@ local or deployed environment needs:
 Depending on the features you enable, you may also need provider keys. The
 default provider is OpenRouter, so `OPENROUTER_API_KEY` is the normal key for
 local chat, indexing, embeddings, and wiki generation.
+
+### Workforce SSO (Authentik)
+
+Colab Ai Hub uses [Authentik](https://github.com/goauthentik/authentik) as its
+workforce SSO identity provider over SAML 2.0. Enable it with
+`WORKFORCE_SSO_ENABLED=true` and the `WORKFORCE_SAML_*` variables described in
+[`docs/authentik-sso-setup.md`](docs/authentik-sso-setup.md). When enabled,
+email/password sign-in is disabled and users sign in through Authentik.
 
 ### Access Policy
 

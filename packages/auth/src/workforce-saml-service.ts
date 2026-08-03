@@ -34,6 +34,53 @@ export function parseWorkforceSamlSigningCertificates(rawCertificate: string): s
     .filter(Boolean)
 }
 
+// Attribute names checked for the user's email, in order. Authentik's default SAML
+// property mappings emit the WS-Fed claim URI; plain `email`/`mail` cover IdPs with
+// friendly attribute names.
+const EMAIL_ATTRIBUTE_KEYS = [
+  'email',
+  'mail',
+  'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress',
+  'urn:oid:0.9.2342.19200300.100.1.3',
+]
+
+const NAME_ATTRIBUTE_KEYS = [
+  'name',
+  'http://schemas.goauthentik.io/2021/02/saml/name',
+  'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name',
+  'urn:oid:2.5.4.3',
+]
+
+function firstAttributeString(
+  attributes: Record<string, unknown> | undefined,
+  keys: string[],
+): string | null {
+  for (const key of keys) {
+    const value = attributes?.[key]
+    const candidate = Array.isArray(value) ? value[0] : value
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim()
+  }
+  return null
+}
+
+export function resolveWorkforceSamlIdentity(extract: {
+  nameID?: unknown
+  attributes?: Record<string, unknown>
+}): { email: string; name: string | null } {
+  const nameId = typeof extract.nameID === 'string' ? extract.nameID.trim() : ''
+  const attributeEmail = firstAttributeString(extract.attributes, EMAIL_ATTRIBUTE_KEYS)
+
+  // Prefer an email-shaped NameID; otherwise fall back to email attributes. Authentik
+  // may send an opaque/hashed NameID depending on the provider's NameID mapping, so a
+  // non-email NameID must not shadow an explicit email attribute.
+  const email = nameId.includes('@') ? nameId : (attributeEmail ?? nameId)
+
+  return {
+    email,
+    name: firstAttributeString(extract.attributes, NAME_ATTRIBUTE_KEYS),
+  }
+}
+
 export function resolveWorkforceSamlNotOnOrAfter(input: {
   conditionsNotOnOrAfter: unknown
   subjectConfirmationNotOnOrAfter: unknown
@@ -102,9 +149,7 @@ export function buildWorkforceSamlService(config: WorkforceSsoConfig) {
         conditions?: { notOnOrAfter?: unknown }
         subjectConfirmationData?: { notOnOrAfter?: unknown }
       }
-      const email = String(
-        extract.nameID || extract.attributes?.email || extract.attributes?.mail || '',
-      )
+      const identity = resolveWorkforceSamlIdentity(extract)
       const assertionId = String(extract.assertion?.id || extract.response?.id || '')
       const notOnOrAfter = resolveWorkforceSamlNotOnOrAfter({
         conditionsNotOnOrAfter: extract.conditions?.notOnOrAfter,
@@ -113,8 +158,8 @@ export function buildWorkforceSamlService(config: WorkforceSsoConfig) {
 
       return {
         assertionId,
-        email,
-        name: typeof extract.attributes?.name === 'string' ? extract.attributes.name : null,
+        email: identity.email,
+        name: identity.name,
         notOnOrAfter,
         relayState: input.relayState,
       }
