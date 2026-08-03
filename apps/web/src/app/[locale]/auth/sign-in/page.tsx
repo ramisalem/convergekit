@@ -37,7 +37,7 @@ export default function SignInPage() {
   const [loading, setLoading] = useState(false)
   // null = config not yet loaded; render a neutral skeleton instead of guessing the disabled state.
   const [workforceSsoEnabled, setWorkforceSsoEnabled] = useState<boolean | null>(null)
-  const [workforceSsoProviderLabel, setWorkforceSsoProviderLabel] = useState('Workforce SSO')
+  const [workforceSsoProviderLabel, setWorkforceSsoProviderLabel] = useState('Authentik')
 
   useEffect(() => {
     authConfigApi

@@ -1,6 +1,7 @@
 .PHONY: help dev build lint typecheck clean \
         docker\:up docker\:down docker\:logs \
         compose\:setup-host compose\:prod compose\:dev compose\:down compose\:logs compose\:config \
+        authentik\:up authentik\:down authentik\:logs \
         db\:prepare-local db\:migrate db\:generate db\:studio \
         worker\:start install test verify smoke\:local
 
@@ -9,8 +10,10 @@ COMPOSE_PROJECT_NAME ?= convergekit
 DOCKER_COMPOSE ?= docker compose -f $(COMPOSE_FILE)
 COMPOSE_LOCAL_FILE ?= compose.local.yaml
 COMPOSE_DEV_FILE ?= compose.dev.yaml
+COMPOSE_AUTHENTIK_FILE ?= compose.authentik.yaml
 DOCKER_COMPOSE_LOCAL ?= docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_LOCAL_FILE)
 DOCKER_COMPOSE_DEV ?= docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_LOCAL_FILE) -f $(COMPOSE_DEV_FILE)
+DOCKER_COMPOSE_AUTHENTIK ?= docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_AUTHENTIK_FILE)
 export COMPOSE_PROJECT_NAME
 
 -include apps/api/.env
@@ -41,6 +44,11 @@ help:
 	@echo "    make compose:dev         Start hot-reload local stack behind HTTPS proxy"
 	@echo "    make compose:down        Stop the full local Compose stack"
 	@echo "    make compose:logs        Tail full local Compose stack logs"
+	@echo ""
+	@echo "  Workforce SSO (optional)"
+	@echo "    make authentik:up        Start the Authentik identity provider on :9000"
+	@echo "    make authentik:down      Stop Authentik (keeps its data volumes)"
+	@echo "    make authentik:logs      Tail Authentik logs"
 	@echo ""
 	@echo "  Database"
 	@echo "    make db:prepare-local  Preserve/rename legacy local DB into the canonical DB"
@@ -121,6 +129,17 @@ compose\:logs: ## Tail logs from the full local Compose stack
 
 compose\:config: ## Validate base, production-like, and hot-reload Compose configs
 	bash scripts/local-compose-config.test.sh
+
+# ─── Workforce SSO ────────────────────────────────────────────────────────────
+
+authentik\:up: ## Start the optional Authentik identity provider (http://localhost:9000)
+	$(DOCKER_COMPOSE_AUTHENTIK) up -d
+
+authentik\:down: ## Stop Authentik, keeping its data volumes
+	$(DOCKER_COMPOSE_AUTHENTIK) stop authentik-server authentik-worker authentik-postgres
+
+authentik\:logs: ## Tail Authentik logs
+	$(DOCKER_COMPOSE_AUTHENTIK) logs -f authentik-server authentik-worker
 
 # ─── Database ─────────────────────────────────────────────────────────────────
 

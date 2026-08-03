@@ -101,7 +101,7 @@ assert_file_contains "${ROOT_DIR}/apps/api/.env.example" 'BETTER_AUTH_URL=https:
   'API local env example uses the local HTTPS auth origin'
 assert_file_contains "${ROOT_DIR}/apps/api/.env.example" 'WEB_APP_URL=https://convergekit-dev.local' \
   'API local env example uses the local HTTPS web origin'
-assert_file_contains "${ROOT_DIR}/apps/api/.env.example" 'WORKFORCE_SSO_PROVIDER_LABEL=Workforce SSO' \
+assert_file_contains "${ROOT_DIR}/apps/api/.env.example" 'WORKFORCE_SSO_PROVIDER_LABEL=Authentik' \
   'API local env example uses the public SSO label'
 assert_file_contains "${ROOT_DIR}/apps/api/.env.example" 'WORKFORCE_SAML_SP_ENTITY_ID=urn:convergekit:dev' \
   'API local env example uses the public SAML entity identifier'

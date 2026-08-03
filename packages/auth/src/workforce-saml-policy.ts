@@ -54,6 +54,9 @@ export function resolveWorkforceSamlSignIn(input: {
     return { allowed: true, action: 'reuse', userId: input.existingUser.id }
   }
   if (input.adminCount <= 0) {
+    // The first admin must come through GitHub OAuth, not SSO: requireAuth demands a linked
+    // GitHub account with an access token for every admin (admins index repositories through
+    // GitHub), so an SSO-provisioned admin would be 401'd on every request.
     return { allowed: false, code: 'bootstrap_admin_required' }
   }
   return { allowed: true, action: 'create', data: { role: 'user', groupId: null } }

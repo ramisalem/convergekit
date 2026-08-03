@@ -237,6 +237,12 @@ workforce SSO identity provider over SAML 2.0. Enable it with
 [`docs/authentik-sso-setup.md`](docs/authentik-sso-setup.md). When enabled,
 email/password sign-in is disabled and users sign in through Authentik.
 
+`compose.authentik.yaml` runs Authentik alongside the stack if you do not
+already have one — `make authentik:up` starts it on `http://localhost:9000`.
+Bootstrap the first admin through GitHub before enabling SSO (`INITIAL_ADMIN_EMAIL`
+plus the sign-in page's **Admin** tab); admins are GitHub-linked by design, and
+until one exists every SSO sign-in is refused with `bootstrap_admin_required`.
+
 ### Access Policy
 
 Colab Ai Hub can restrict who can sign in and which repositories can be indexed

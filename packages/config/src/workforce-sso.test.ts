@@ -10,10 +10,10 @@ const accessPolicy: AccessPolicyConfig = {
 }
 
 describe('resolveWorkforceSsoConfig', () => {
-  it('defaults workforce SSO to disabled with Colab Ai Hub SSO label and 14-day sessions', () => {
+  it('defaults workforce SSO to disabled with the Authentik label and 14-day sessions', () => {
     expect(resolveWorkforceSsoConfig({}, accessPolicy)).toMatchObject({
       workforceSsoEnabled: false,
-      providerLabel: 'Colab Ai Hub SSO',
+      providerLabel: 'Authentik',
       sessionTtlDays: 14,
       supportAdminEmails: [],
     })

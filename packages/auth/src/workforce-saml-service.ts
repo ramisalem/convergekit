@@ -72,12 +72,16 @@ export function resolveWorkforceSamlIdentity(extract: {
   const nameId = typeof extract.nameID === 'string' ? extract.nameID.trim() : ''
   const attributeEmail = firstAttributeString(extract.attributes, EMAIL_ATTRIBUTE_KEYS)
 
-  // Prefer an email-shaped NameID; otherwise fall back to email attributes. Authentik
-  // may send an opaque/hashed NameID depending on the provider's NameID mapping, so a
-  // non-email NameID must not shadow an explicit email attribute.
-  const email = nameId.includes('@') ? nameId : (attributeEmail ?? nameId)
-  if (!email) {
-    // An empty identity must never reach account lookup/linking downstream.
+  // The explicit email attribute wins over the NameID. SAML NameID is an opaque subject
+  // identifier by design, and Authentik's NameID mapping is deployment-configurable: it may
+  // be a hashed user ID, a UPN (`user@corp.internal`), or the email address. Only the email
+  // attribute is guaranteed to be the address the account should be keyed on, so an
+  // email-shaped-but-wrong NameID (UPN) must not shadow it. The NameID is the fallback for
+  // IdPs that send no email attribute at all.
+  const email = attributeEmail ?? nameId
+  if (!email.includes('@')) {
+    // An opaque or empty identity must never reach account lookup/linking downstream — it
+    // would otherwise be rejected one layer later with a much vaguer error.
     throw new Error('SAML response did not contain a resolvable email identity')
   }
 

@@ -107,10 +107,11 @@ SECOND
     ).toBe('2029-01-01T00:00:00.000Z')
   })
 
-  it('uses an email-shaped NameID as the identity email', () => {
-    expect(
-      resolveWorkforceSamlIdentity({ nameID: 'user@example.com', attributes: {} }),
-    ).toEqual({ email: 'user@example.com', name: null })
+  it('uses an email-shaped NameID when the IdP sends no email attribute', () => {
+    expect(resolveWorkforceSamlIdentity({ nameID: 'user@example.com', attributes: {} })).toEqual({
+      email: 'user@example.com',
+      name: null,
+    })
   })
 
   it('falls back to Authentik claim-URI attributes when the NameID is opaque', () => {
@@ -125,6 +126,19 @@ SECOND
     ).toEqual({ email: 'user@example.com', name: 'Test User' })
   })
 
+  it('prefers the email attribute over a UPN-shaped NameID', () => {
+    // Authentik's UPN NameID mapping emits `user@corp.internal`, which is email-shaped but is
+    // not the address the account is keyed on — and would be denied by ACCESS_ALLOWED_EMAIL_DOMAIN.
+    expect(
+      resolveWorkforceSamlIdentity({
+        nameID: 'user@corp.internal',
+        attributes: {
+          'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress': 'user@example.com',
+        },
+      }),
+    ).toEqual({ email: 'user@example.com', name: null })
+  })
+
   it('reads friendly email/name attribute names and unwraps array values', () => {
     expect(
       resolveWorkforceSamlIdentity({
@@ -134,11 +148,10 @@ SECOND
     ).toEqual({ email: 'user@example.com', name: 'Test User' })
   })
 
-  it('keeps the opaque NameID when no email attribute is present', () => {
-    expect(resolveWorkforceSamlIdentity({ nameID: 'a1b2c3d4e5f6', attributes: {} })).toEqual({
-      email: 'a1b2c3d4e5f6',
-      name: null,
-    })
+  it('rejects an opaque NameID when no email attribute is present', () => {
+    expect(() => resolveWorkforceSamlIdentity({ nameID: 'a1b2c3d4e5f6', attributes: {} })).toThrow(
+      /resolvable email identity/,
+    )
   })
 
   it('reads OID email and name attributes and skips empty array members', () => {

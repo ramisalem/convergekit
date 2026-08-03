@@ -1,0 +1,79 @@
+# Optional Authentik identity provider for Workforce SSO.
+#
+# Nothing in the default stack depends on this file — layer it in explicitly:
+#
+#   docker compose -f compose.yaml -f compose.local.yaml -f compose.authentik.yaml up -d
+#   make authentik:up
+#
+# Authentik only has to be reachable by the *browser*: SAML here is front-channel
+# only (redirect out, form POST back), so the API never calls Authentik directly.
+# See docs/authentik-sso-setup.md.
+services:
+  authentik-postgres:
+    # Same image as the app database so this overlay pulls nothing extra.
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:-authentik_secret}
+      POSTGRES_DB: authentik
+    volumes:
+      - authentik_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U authentik -d authentik']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-latest}
+    restart: unless-stopped
+    command: server
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment: &authentik-env
+      # Generate with: openssl rand -base64 48
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?set AUTHENTIK_SECRET_KEY in .env (openssl rand -base64 48)}
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:-authentik_secret}
+      # Shares the stack's Redis on a separate logical database.
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_REDIS__DB: 1
+      # Optional first-run admin (`akadmin`). Empty values are ignored by Authentik, which
+      # then falls back to the initial-setup flow at
+      # http://localhost:9000/if/flow/initial-setup/.
+      AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOTSTRAP_EMAIL:-}
+      AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:-}
+      AUTHENTIK_BOOTSTRAP_TOKEN: ${AUTHENTIK_BOOTSTRAP_TOKEN:-}
+    ports:
+      - '${AUTHENTIK_PORT:-9000}:9000'
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-latest}
+    restart: unless-stopped
+    command: worker
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment: *authentik-env
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+      - authentik_certs:/certs
+
+volumes:
+  authentik_postgres_data:
+  authentik_media:
+  authentik_templates:
+  authentik_certs:
