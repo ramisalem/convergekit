@@ -23,14 +23,14 @@ export function ConvergeKitLogoMark({
       <path
         d="M8 10.25C12.6 10.25 14.8 16 20.7 16"
         fill="none"
-        stroke="#7dd3fc"
+        stroke="#f8747c"
         strokeLinecap="round"
         strokeWidth="2.2"
       />
       <path
         d="M8 21.75C12.6 21.75 14.8 16 20.7 16"
         fill="none"
-        stroke="#86efac"
+        stroke="#f14251"
         strokeLinecap="round"
         strokeWidth="2.2"
       />
@@ -44,15 +44,15 @@ export function ConvergeKitLogoMark({
       <path
         d="M20.7 16L25 11.75M20.7 16L25 20.25"
         fill="none"
-        stroke="#c4b5fd"
+        stroke="#fba6a9"
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="2.2"
       />
-      <circle cx="8" cy="10.25" r="1.9" fill="#7dd3fc" />
-      <circle cx="8" cy="21.75" r="1.9" fill="#86efac" />
+      <circle cx="8" cy="10.25" r="1.9" fill="#f8747c" />
+      <circle cx="8" cy="21.75" r="1.9" fill="#f14251" />
       <circle cx="9.2" cy="16" r="1.9" fill="white" />
-      <circle cx="20.7" cy="16" r="2.4" fill="#f8fafc" />
+      <circle cx="20.7" cy="16" r="2.4" fill="#fff1f1" />
     </svg>
   )
 }
@@ -71,7 +71,7 @@ export function ConvergeKitLogo({
   return (
     <span className={cn('inline-flex min-w-0 items-center gap-2.5', className)}>
       <ConvergeKitLogoMark className={cn('h-6 w-6', markClassName)} />
-      <span className={cn('truncate', labelClassName)}>ConvergeKit</span>
+      <span className={cn('truncate', labelClassName)}>Colab Ai Hub</span>
     </span>
   )
 }

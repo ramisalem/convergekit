@@ -38,7 +38,7 @@ export function createMcpServer(
 ): McpServer {
   const { embeddingOptions, enabledTools } = options
   const server = new McpServer({
-    name: 'convergekit',
+    name: 'colab-ai-hub',
     version: '1.0.0',
   })
 

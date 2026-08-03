@@ -80,7 +80,7 @@ export default function SignInPage() {
     <div className="grid min-h-[calc(100vh-52px)] place-items-center px-6 py-12">
       <div className="w-full max-w-[380px]">
         <div className="mb-[22px] flex items-center justify-center">
-          <a href="/" aria-label="ConvergeKit home">
+          <a href="/" aria-label="Colab Ai Hub home">
             <ConvergeKitLogoMark className="h-9 w-9" />
           </a>
         </div>

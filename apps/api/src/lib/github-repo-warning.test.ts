@@ -24,7 +24,7 @@ describe('buildGitHubRepoWarning', () => {
         userRepoOrganizationCount: 0,
       }),
     ).toBe(
-      'GitHub returned only personal repositories. If you expected organization repositories, ask an organization owner to approve the ConvergeKit OAuth app, then reconnect GitHub.',
+      'GitHub returned only personal repositories. If you expected organization repositories, ask an organization owner to approve the Colab Ai Hub OAuth app, then reconnect GitHub.',
     )
   })
 

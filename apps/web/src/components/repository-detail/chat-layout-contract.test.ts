@@ -132,11 +132,11 @@ describe('chat layout contract', () => {
   })
 
   it('gives user and assistant turns visible boundaries', () => {
-    expect(chatSessionViewSource).toContain('ConvergeKit')
+    expect(chatSessionViewSource).toContain('Colab Ai Hub')
     expect(chatSessionViewSource).toContain('You')
     expect(chatSessionViewSource).toContain('rounded-[14px_14px_4px_14px]')
     expect(chatSessionViewSource).toContain('bg-[var(--convergekit-ink)] text-white')
-    expect(chatSessionViewSource).toContain('ConvergeKit ·')
+    expect(chatSessionViewSource).toContain('Colab Ai Hub ·')
     expect(chatSessionViewSource).toContain('bg-gradient-to-br')
   })
 

@@ -1,7 +1,7 @@
 {
   "nav": {
-    "brand": "ConvergeKit",
-    "brandSuffix": "ConvergeKit",
+    "brand": "Colab Ai Hub",
+    "brandSuffix": "Colab Ai Hub",
     "repositories": "Repositories",
     "connectedAgents": "Connected agents",
     "ciTokens": "CI / automation tokens",
@@ -14,7 +14,7 @@
     "signInDescription": "Sign in to connect repositories and generate AI-powered documentation.",
     "signInWithGitHub": "Continue with GitHub",
     "signInWithWorkforceSso": "Continue with {provider}",
-    "workforceSsoNotConfigured": "ConvergeKit SSO is not configured.",
+    "workforceSsoNotConfigured": "Colab Ai Hub SSO is not configured.",
     "invitedAccountSeparator": "or sign in with an invited account",
     "privacyNote": "By signing in, you agree to our terms of service and privacy policy."
   },
@@ -78,10 +78,10 @@
     }
   },
   "home": {
-    "title": "ConvergeKit",
+    "title": "Colab Ai Hub",
     "badge": "Alignment for software teams",
     "headline": "The shared source of truth for product, engineering, and AI agents",
-    "subheadline": "Product managers, engineers, and AI agents use ConvergeKit to understand what the code actually does, why decisions were made, and where work should happen next.",
+    "subheadline": "Product managers, engineers, and AI agents use Colab Ai Hub to understand what the code actually does, why decisions were made, and where work should happen next.",
     "cta": "Open repositories",
     "signInCta": "Sign in",
     "feature1Title": "For product managers",
@@ -136,12 +136,12 @@
       "description": "Browse the file and directory structure of the indexed repository."
     },
     "repoGuide": {
-      "headline": "What ConvergeKit knows about this repo",
+      "headline": "What Colab Ai Hub knows about this repo",
       "headlineDescription": "Use this guide to understand the indexed knowledge and phrase questions so answers come from the strongest evidence.",
       "coverageTitle": "Indexed knowledge coverage",
-      "coverageDescription": "A high-level map of where ConvergeKit has strong, partial, or gated evidence.",
+      "coverageDescription": "A high-level map of where Colab Ai Hub has strong, partial, or gated evidence.",
       "preparingTitle": "Preparing indexed knowledge coverage",
-      "preparingDescription": "ConvergeKit is indexing evidence for this repository. Answer quality may improve when indexing completes.",
+      "preparingDescription": "Colab Ai Hub is indexing evidence for this repository. Answer quality may improve when indexing completes.",
       "metadataRefreshing": "Metadata still being refreshed. This guide is using path-based classification until the evidence backfill completes.",
       "computingAreas": "Still computing repo areas",
       "computingAreasDescription": "These temporary areas use top-level paths and will be replaced by the repo mind map when it is ready.",
@@ -215,7 +215,7 @@
     "empty": "No repositories yet",
     "emptyDescription": "Connect your first repository to start generating AI-powered documentation.",
     "emptyAssignedTitle": "No repositories assigned yet",
-    "emptyAssignedDescription": "Your ConvergeKit account is active, but an admin needs to assign you to a group before repositories appear here.",
+    "emptyAssignedDescription": "Your Colab Ai Hub account is active, but an admin needs to assign you to a group before repositories appear here.",
     "emptyAssignedContactsLabel": "Reach out to:",
     "name": "Name",
     "provider": "Provider",
@@ -258,7 +258,7 @@
     "backToRepo": "Back to repository"
   },
   "mcpConsent": {
-    "title": "Connect {client} to ConvergeKit",
+    "title": "Connect {client} to Colab Ai Hub",
     "subtitle": "Signed in as {email}",
     "grant": "Read-only access to repositories you can access (currently {count})",
     "scopes": "Permissions",

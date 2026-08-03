@@ -9,7 +9,7 @@ describe('ConvergeKit design token cascade', () => {
 
     expect(fumadocsImportIndex).toBeGreaterThanOrEqual(0)
     expect(tokenIndex).toBeGreaterThan(fumadocsImportIndex)
-    expect(source).toContain('--convergekit-ink: #0e1116')
+    expect(source).toContain('--convergekit-ink: #0c1e27')
     expect(source).toContain('background-color: var(--convergekit-bg-2)')
   })
 })

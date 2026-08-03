@@ -46,11 +46,11 @@ export function createUserScopedMcpServer(
   options: UserServerOptions = {},
 ): McpServer {
   const enabled = options.enabledTools ?? { searchDocs: true, getStructure: true, readFile: true }
-  const server = new McpServer({ name: 'convergekit', version: '1.0.0' })
+  const server = new McpServer({ name: 'colab-ai-hub', version: '1.0.0' })
 
   server.tool(
     'list_repositories',
-    'List the repositories you can access in ConvergeKit. Each entry includes a `description` (what the repo is) and `topics` (feature areas) — use these to pick the right repository and to seed `search_docs` queries. Pass a returned `id` (preferred) or exact `name` as the `repository` argument for the other tools.',
+    'List the repositories you can access in Colab Ai Hub. Each entry includes a `description` (what the repo is) and `topics` (feature areas) — use these to pick the right repository and to seed `search_docs` queries. Pass a returned `id` (preferred) or exact `name` as the `repository` argument for the other tools.',
     {},
     async () => text(JSON.stringify(await deps.listRepositories(), null, 2)),
   )

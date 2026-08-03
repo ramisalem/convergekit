@@ -35,7 +35,7 @@ export const env = createEnv({
 
     // Workforce SSO (explicitly gated by WORKFORCE_SSO_ENABLED)
     WORKFORCE_SSO_ENABLED: z.enum(['true', 'false']).default('false'),
-    WORKFORCE_SSO_PROVIDER_LABEL: optionalNonEmptyString.default('ConvergeKit SSO'),
+    WORKFORCE_SSO_PROVIDER_LABEL: optionalNonEmptyString.default('Colab Ai Hub SSO'),
     WORKFORCE_SAML_IDP_SSO_URL: optionalNonEmptyString,
     WORKFORCE_SAML_IDP_ENTITY_ID: optionalNonEmptyString,
     WORKFORCE_SAML_IDP_CERT: optionalNonEmptyString,

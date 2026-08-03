@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import './globals.css'
 
 export const metadata = {
-  title: { default: 'ConvergeKit', template: '%s | ConvergeKit' },
+  title: { default: 'Colab Ai Hub', template: '%s | Colab Ai Hub' },
   description: 'The shared source of truth for product, engineering, and AI agents.',
 }
 

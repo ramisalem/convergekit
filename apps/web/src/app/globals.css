@@ -4,41 +4,41 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 200 53% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 200 53% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --popover-foreground: 200 53% 10%;
+    --primary: 350 80% 42%;
+    --primary-foreground: 355 100% 97%;
+    --secondary: 0 0% 97%;
+    --secondary-foreground: 0 0% 19%;
+    --muted: 0 0% 97%;
+    --muted-foreground: 0 0% 44%;
+    --accent: 355 100% 97%;
+    --accent-foreground: 349 76% 35%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 0 0% 89%;
+    --input: 0 0% 89%;
+    --ring: 350 80% 42%;
     --radius: 0.5rem;
 
-    --convergekit-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Text',
-      'Inter var', Inter, Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --convergekit-font-sans: Roboto, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+      'Helvetica Neue', Arial, sans-serif;
     --convergekit-font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco,
       'Cascadia Mono', 'Roboto Mono', Consolas, monospace;
     --convergekit-bg: #ffffff;
-    --convergekit-bg-2: #fafafa;
-    --convergekit-bg-3: #f4f5f7;
-    --convergekit-line: #e6e8ec;
-    --convergekit-line-2: #eef0f3;
-    --convergekit-line-strong: #d3d6dc;
-    --convergekit-ink: #0e1116;
-    --convergekit-ink-2: #2a2f3a;
-    --convergekit-ink-3: #5b6472;
-    --convergekit-ink-4: #8a93a3;
-    --convergekit-focus: #2563eb;
+    --convergekit-bg-2: #f7f7f7;
+    --convergekit-bg-3: #efefef;
+    --convergekit-line: #e3e3e3;
+    --convergekit-line-2: #ececec;
+    --convergekit-line-strong: #c8c8c8;
+    --convergekit-ink: #0c1e27;
+    --convergekit-ink-2: #313131;
+    --convergekit-ink-3: #515151;
+    --convergekit-ink-4: #818181;
+    --convergekit-focus: #c11631;
     --convergekit-auth-a-fg: #1d4ed8;
     --convergekit-auth-a-bg: #eff6ff;
     --convergekit-auth-a-bd: #2563eb;

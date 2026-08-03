@@ -18,7 +18,7 @@ export DATABASE_URL
 
 # Default target: show available commands
 help:
-	@echo "ConvergeKit — available targets:"
+	@echo "Colab Ai Hub — available targets:"
 	@echo ""
 	@echo "  Development"
 	@echo "    make dev           Start the full hot-reload Docker Compose dev stack"

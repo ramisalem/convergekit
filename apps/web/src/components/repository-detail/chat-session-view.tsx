@@ -321,7 +321,7 @@ export function ChatSessionView({
                     {isAssistant ? (
                       <>
                         <ConvergeKitLogoMark className="h-[22px] w-[22px] bg-gradient-to-br" />
-                        <span>ConvergeKit · Claude Sonnet 4.5</span>
+                        <span>Colab Ai Hub · Claude Sonnet 4.5</span>
                       </>
                     ) : (
                       'You'

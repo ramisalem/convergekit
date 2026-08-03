@@ -12,14 +12,14 @@ export function buildGitHubRepoWarning(summary: GitHubRepoVisibilitySummary): st
   }
 
   if (summary.orgDiscoveryFailed) {
-    return 'GitHub organization repositories could not be loaded. Reconnect GitHub and confirm the organization has approved the ConvergeKit OAuth app.'
+    return 'GitHub organization repositories could not be loaded. Reconnect GitHub and confirm the organization has approved the Colab Ai Hub OAuth app.'
   }
 
   const organizationReposVisible =
     summary.organizationRepoCount > 0 || summary.userRepoOrganizationCount > 0
 
   if (summary.organizationCount === 0 && !organizationReposVisible) {
-    return 'GitHub returned only personal repositories. If you expected organization repositories, ask an organization owner to approve the ConvergeKit OAuth app, then reconnect GitHub.'
+    return 'GitHub returned only personal repositories. If you expected organization repositories, ask an organization owner to approve the Colab Ai Hub OAuth app, then reconnect GitHub.'
   }
 
   return null
