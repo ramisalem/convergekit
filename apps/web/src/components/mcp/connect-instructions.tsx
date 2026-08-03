@@ -16,9 +16,9 @@ export function ConnectInstructions() {
   useEffect(() => setOrigin(window.location.origin), [])
   const endpoint = `${origin}/api/mcp`
   const SNIPPETS: Record<Client, string> = {
-    claudeCode: `claude mcp add --transport http convergekit ${endpoint}`,
+    claudeCode: `claude mcp add --transport http colab-ai-hub ${endpoint}`,
     claudeDesktop: endpoint,
-    cursor: JSON.stringify({ mcpServers: { convergekit: { url: endpoint } } }, null, 2),
+    cursor: JSON.stringify({ mcpServers: { 'colab-ai-hub': { url: endpoint } } }, null, 2),
     generic: endpoint,
   }
   const tabs: Client[] = ['claudeCode', 'claudeDesktop', 'cursor', 'generic']

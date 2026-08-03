@@ -195,7 +195,7 @@ export function ChatActivityRail({ snapshot }: { snapshot: ChatActivitySnapshot 
         {items.length === 0 ? (
           <div className="flex min-h-0 flex-1 items-center justify-center px-4 text-center">
             <p className="text-xs leading-5 text-[var(--convergekit-ink-4)]">
-              Activity appears here as ConvergeKit searches the indexed codebase.
+              Activity appears here as Colab Ai Hub searches the indexed codebase.
             </p>
           </div>
         ) : (

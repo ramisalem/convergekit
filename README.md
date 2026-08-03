@@ -1,18 +1,18 @@
-# ConvergeKit
+# Colab Ai Hub
 
-![ConvergeKit logo](.github/assets/convergekit-logo.svg)
+![Colab Ai Hub logo](.github/assets/convergekit-logo.svg)
 
-ConvergeKit brings product intent, code reality, and agent context together.
+Colab Ai Hub brings product intent, code reality, and agent context together.
 
 It turns repositories into a shared evidence layer so product teams, engineers,
-and AI agents can work from the same understanding. ConvergeKit indexes code,
+and AI agents can work from the same understanding. Colab Ai Hub indexes code,
 classifies and ranks the files that matter, generates structured wiki content,
 supports chat over repository context, and exposes repository knowledge through
 a web UI, REST API, background workers, and MCP.
 
 ## The Skim
 
-ConvergeKit helps an engineering organization converge around what the product
+Colab Ai Hub helps an engineering organization converge around what the product
 is meant to do, what the code actually does, and what AI agents need to know
 before they act.
 
@@ -45,7 +45,7 @@ The wiki is generated from repository context and keeps the source evidence near
 the page. Ranked files make it clear which code, tests, docs, and config back a
 piece of documentation.
 
-![ConvergeKit evidence-ranked wiki reader](docs/assets/screenshots/wiki-evidence-reader.jpg)
+![Colab Ai Hub evidence-ranked wiki reader](docs/assets/screenshots/wiki-evidence-reader.jpg)
 
 ### Repository Guide Classification
 
@@ -53,22 +53,22 @@ The guide view groups the repository by functional areas, ranks source coverage,
 and turns that evidence map into high-confidence questions for product and
 engineering review.
 
-![ConvergeKit repository guide classification](docs/assets/screenshots/repo-guide-classification.jpg)
+![Colab Ai Hub repository guide classification](docs/assets/screenshots/repo-guide-classification.jpg)
 
 ### Chat With Agent Activity
 
 Chat answers stay grounded in repository evidence. The side rail shows the
 files the search agent used so humans and AI agents can audit the answer path.
 
-![ConvergeKit chat with search agent activity](docs/assets/screenshots/chat-agent-activity.jpg)
+![Colab Ai Hub chat with search agent activity](docs/assets/screenshots/chat-agent-activity.jpg)
 
 ### MCP Client Configuration
 
 Repository knowledge can be exposed to external AI clients through scoped MCP
-tokens. ConvergeKit generates client-specific setup snippets for Claude
+tokens. Colab Ai Hub generates client-specific setup snippets for Claude
 Desktop, Cursor, and generic JSON clients.
 
-![ConvergeKit MCP client configuration](docs/assets/screenshots/mcp-client-config.jpg)
+![Colab Ai Hub MCP client configuration](docs/assets/screenshots/mcp-client-config.jpg)
 
 ## Quick Start
 
@@ -111,7 +111,7 @@ pnpm turbo dev
 ```
 
 This runs only PostgreSQL and Redis in Docker while starting the API, worker,
-and web processes on the host. The default ConvergeKit dev flow is the
+and web processes on the host. The default Colab Ai Hub dev flow is the
 containerized stack above.
 
 ### Minimal Local Flow
@@ -127,13 +127,17 @@ Local development mirrors production ingress shape: browser requests use the
 single web origin (`https://convergekit-dev.local/api/...`), and the reverse
 proxy routes `/api/*` to the API container.
 
-For Workforce SSO local SAML testing, configure the dev SAML app with:
+For Workforce SSO local SAML testing, configure the Authentik SAML provider
+with:
 
 ```text
 ACS URL:   https://convergekit-dev.local/api/auth/workforce-saml/acs
-Entity ID: urn:convergekit:dev
+Audience:  urn:convergekit:dev
 Start URL: https://convergekit-dev.local/en/auth/sign-in
 ```
+
+See [`docs/authentik-sso-setup.md`](docs/authentik-sso-setup.md) for the full
+Authentik walkthrough.
 
 To run the local smoke checks after starting the stack:
 
@@ -225,9 +229,17 @@ Depending on the features you enable, you may also need provider keys. The
 default provider is OpenRouter, so `OPENROUTER_API_KEY` is the normal key for
 local chat, indexing, embeddings, and wiki generation.
 
+### Workforce SSO (Authentik)
+
+Colab Ai Hub uses [Authentik](https://github.com/goauthentik/authentik) as its
+workforce SSO identity provider over SAML 2.0. Enable it with
+`WORKFORCE_SSO_ENABLED=true` and the `WORKFORCE_SAML_*` variables described in
+[`docs/authentik-sso-setup.md`](docs/authentik-sso-setup.md). When enabled,
+email/password sign-in is disabled and users sign in through Authentik.
+
 ### Access Policy
 
-ConvergeKit can restrict who can sign in and which repositories can be indexed
+Colab Ai Hub can restrict who can sign in and which repositories can be indexed
 through deployment configuration:
 
 | Env var                          | Default      | Purpose                                                                                      |
@@ -243,7 +255,7 @@ require restarting or redeploying the API/auth runtime.
 
 ## Deployment
 
-ConvergeKit ships as standard Docker images for the web, API, worker, and database
+Colab Ai Hub ships as standard Docker images for the web, API, worker, and database
 migration workloads. This repository does not prescribe a cloud provider.
 
 At minimum a deployment needs:
@@ -264,4 +276,4 @@ development and pull request expectations.
 
 ## License
 
-ConvergeKit is released under the MIT License. See [LICENSE](LICENSE).
+Colab Ai Hub is released under the MIT License. See [LICENSE](LICENSE).

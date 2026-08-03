@@ -5,14 +5,15 @@ import {
   buildWorkforceSamlService,
   configureWorkforceSamlSchemaValidator,
   parseWorkforceSamlSigningCertificates,
+  resolveWorkforceSamlIdentity,
   resolveWorkforceSamlNotOnOrAfter,
 } from './workforce-saml-service.js'
 
 const enabledConfig: WorkforceSsoConfig = {
   workforceSsoEnabled: true,
-  providerLabel: 'ConvergeKit SSO',
-  idpSsoUrl: 'https://accounts.google.com/o/saml2/idp?idpid=test',
-  idpEntityId: 'https://accounts.google.com/o/saml2?idpid=test',
+  providerLabel: 'Authentik',
+  idpSsoUrl: 'https://authentik.example.com/application/saml/colab-ai-hub/sso/binding/redirect/',
+  idpEntityId: 'https://authentik.example.com',
   idpCertificate: '-----BEGIN CERTIFICATE-----\nMIID\n-----END CERTIFICATE-----',
   spEntityId: 'urn:convergekit:dev',
   acsUrl: 'http://localhost:4001/api/auth/workforce-saml/acs',
@@ -104,6 +105,61 @@ SECOND
         subjectConfirmationNotOnOrAfter: '2029-01-01T00:00:00.000Z',
       }).toISOString(),
     ).toBe('2029-01-01T00:00:00.000Z')
+  })
+
+  it('uses an email-shaped NameID as the identity email', () => {
+    expect(
+      resolveWorkforceSamlIdentity({ nameID: 'user@example.com', attributes: {} }),
+    ).toEqual({ email: 'user@example.com', name: null })
+  })
+
+  it('falls back to Authentik claim-URI attributes when the NameID is opaque', () => {
+    expect(
+      resolveWorkforceSamlIdentity({
+        nameID: 'a1b2c3d4e5f6',
+        attributes: {
+          'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress': 'user@example.com',
+          'http://schemas.goauthentik.io/2021/02/saml/name': 'Test User',
+        },
+      }),
+    ).toEqual({ email: 'user@example.com', name: 'Test User' })
+  })
+
+  it('reads friendly email/name attribute names and unwraps array values', () => {
+    expect(
+      resolveWorkforceSamlIdentity({
+        nameID: undefined,
+        attributes: { email: ['user@example.com'], name: ['Test User'] },
+      }),
+    ).toEqual({ email: 'user@example.com', name: 'Test User' })
+  })
+
+  it('keeps the opaque NameID when no email attribute is present', () => {
+    expect(resolveWorkforceSamlIdentity({ nameID: 'a1b2c3d4e5f6', attributes: {} })).toEqual({
+      email: 'a1b2c3d4e5f6',
+      name: null,
+    })
+  })
+
+  it('reads OID email and name attributes and skips empty array members', () => {
+    expect(
+      resolveWorkforceSamlIdentity({
+        nameID: undefined,
+        attributes: {
+          'urn:oid:0.9.2342.19200300.100.1.3': ['', 'user@example.com'],
+          'urn:oid:2.5.4.3': ['', 'Test User'],
+        },
+      }),
+    ).toEqual({ email: 'user@example.com', name: 'Test User' })
+  })
+
+  it('rejects responses without any resolvable email identity', () => {
+    expect(() => resolveWorkforceSamlIdentity({ nameID: undefined, attributes: {} })).toThrow(
+      /resolvable email identity/,
+    )
+    expect(() => resolveWorkforceSamlIdentity({ nameID: '', attributes: { email: '' } })).toThrow(
+      /resolvable email identity/,
+    )
   })
 
   it('rejects malformed SAML responses', async () => {

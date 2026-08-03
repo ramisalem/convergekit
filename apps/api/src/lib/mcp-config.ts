@@ -60,7 +60,7 @@ function slugifyRepositoryName(repositoryName: string | undefined): string | nul
 
 function resolveMcpServerName(repositoryName: string | undefined): string {
   const repositorySlug = slugifyRepositoryName(repositoryName)
-  return repositorySlug ? `${repositorySlug}-convergekit` : 'convergekit'
+  return repositorySlug ? `${repositorySlug}-colab-ai-hub` : 'colab-ai-hub'
 }
 
 export function buildMcpTokenConfig({
@@ -93,9 +93,9 @@ export function buildMcpTokenConfig({
           '--transport',
           'http-only',
           '--header',
-          'Authorization:${CONVERGEKIT_MCP_AUTH}',
+          'Authorization:${COLAB_AI_HUB_MCP_AUTH}',
         ],
-        env: { CONVERGEKIT_MCP_AUTH: authorization },
+        env: { COLAB_AI_HUB_MCP_AUTH: authorization },
       },
     },
   }

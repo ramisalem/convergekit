@@ -48,7 +48,7 @@ export function AccessPolicyPanel({ policy }: Props) {
       </dl>
       <div className="border-t border-neutral-100 bg-neutral-50 px-6 py-4">
         <p className="text-xs text-neutral-500">
-          These values are read-only in ConvergeKit. Change them through deployment configuration.
+          These values are read-only in Colab Ai Hub. Change them through deployment configuration.
         </p>
       </div>
     </section>

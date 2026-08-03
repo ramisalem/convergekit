@@ -10,10 +10,10 @@ const accessPolicy: AccessPolicyConfig = {
 }
 
 describe('resolveWorkforceSsoConfig', () => {
-  it('defaults workforce SSO to disabled with ConvergeKit SSO label and 14-day sessions', () => {
+  it('defaults workforce SSO to disabled with Colab Ai Hub SSO label and 14-day sessions', () => {
     expect(resolveWorkforceSsoConfig({}, accessPolicy)).toMatchObject({
       workforceSsoEnabled: false,
-      providerLabel: 'ConvergeKit SSO',
+      providerLabel: 'Colab Ai Hub SSO',
       sessionTtlDays: 14,
       supportAdminEmails: [],
     })

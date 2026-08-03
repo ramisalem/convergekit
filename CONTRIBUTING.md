@@ -1,6 +1,6 @@
-# Contributing to ConvergeKit
+# Contributing to Colab Ai Hub
 
-Thanks for helping improve ConvergeKit.
+Thanks for helping improve Colab Ai Hub.
 
 ## Local Development
 
@@ -30,7 +30,7 @@ make verify
 
 ## Versioning
 
-ConvergeKit follows SemVer for releases once public packages or tagged
+Colab Ai Hub follows SemVer for releases once public packages or tagged
 artifacts are published. Until the first public release, changes may land under
 the `0.x` line while APIs and deployment contracts settle.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dev.sh - manage the ConvergeKit hot-reload Docker Compose dev stack.
+# dev.sh - manage the Colab Ai Hub hot-reload Docker Compose dev stack.
 
 set -euo pipefail
 
@@ -20,10 +20,10 @@ compose_cmd() {
 }
 
 cmd_start() {
-  echo "Starting ConvergeKit Docker Compose dev stack..."
+  echo "Starting Colab Ai Hub Docker Compose dev stack..."
   compose_cmd up -d --build --wait
   echo ""
-  echo "ConvergeKit is available at:"
+  echo "Colab Ai Hub is available at:"
   echo "  https://convergekit-dev.local"
   echo ""
   echo "Logs:"
@@ -31,7 +31,7 @@ cmd_start() {
 }
 
 cmd_stop() {
-  echo "Stopping ConvergeKit Docker Compose dev stack..."
+  echo "Stopping Colab Ai Hub Docker Compose dev stack..."
   compose_cmd down
 }
 
@@ -59,8 +59,8 @@ Usage: ./dev.sh {start|stop|restart|status|logs|config}
 
 Commands:
   start    Start PostgreSQL, Redis, API, worker, web, and local HTTPS proxy
-  stop     Stop the full ConvergeKit dev stack
-  restart  Stop and start the full ConvergeKit dev stack
+  stop     Stop the full Colab Ai Hub dev stack
+  restart  Stop and start the full Colab Ai Hub dev stack
   status   Show Docker Compose service status
   logs     Tail Docker Compose logs; accepts optional service names
   config   Print the merged Docker Compose config

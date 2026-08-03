@@ -22,7 +22,7 @@ authRoutes.post('/sign-in/email', async (c) => {
   if (workforceSsoConfig.workforceSsoEnabled) {
     return c.json(
       {
-        error: 'Email/password sign-in is disabled. Please use ConvergeKit SSO.',
+        error: 'Email/password sign-in is disabled. Please use Colab Ai Hub SSO.',
         code: 'EMAIL_SIGN_IN_DISABLED',
       },
       403,

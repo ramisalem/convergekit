@@ -10,9 +10,9 @@ describe('buildMcpTokenConfig', () => {
       env: { API_BASE_URL: 'http://localhost:4001' },
     })
 
-    expect(payload.mcpServerName).toBe('example-backend-convergekit')
-    expect(Object.keys(payload.config.mcpServers)).toEqual(['example-backend-convergekit'])
-    expect(payload.config.mcpServers['example-backend-convergekit']?.url).toBe(
+    expect(payload.mcpServerName).toBe('example-backend-colab-ai-hub')
+    expect(Object.keys(payload.config.mcpServers)).toEqual(['example-backend-colab-ai-hub'])
+    expect(payload.config.mcpServers['example-backend-colab-ai-hub']?.url).toBe(
       'http://localhost:4001/api/mcp',
     )
   })
@@ -25,7 +25,7 @@ describe('buildMcpTokenConfig', () => {
       env: { API_BASE_URL: 'http://localhost:4001' },
     })
 
-    expect(payload.mcpServerName).toBe('example-backend-api-convergekit')
+    expect(payload.mcpServerName).toBe('example-backend-api-colab-ai-hub')
   })
 
   it('uses API_BASE_URL when it is configured', () => {
@@ -40,10 +40,10 @@ describe('buildMcpTokenConfig', () => {
     })
 
     expect(payload.mcpEndpoint).toBe('https://convergekit.example.com/api/mcp')
-    expect(payload.config.mcpServers['example-backend-convergekit']?.url).toBe(
+    expect(payload.config.mcpServers['example-backend-colab-ai-hub']?.url).toBe(
       'https://convergekit.example.com/api/mcp',
     )
-    expect(payload.clientConfigs.cursor.config.mcpServers['example-backend-convergekit']?.url).toBe(
+    expect(payload.clientConfigs.cursor.config.mcpServers['example-backend-colab-ai-hub']?.url).toBe(
       'https://convergekit.example.com/api/mcp',
     )
   })
@@ -59,7 +59,7 @@ describe('buildMcpTokenConfig', () => {
       },
     })
 
-    expect(payload.clientConfigs.claudeDesktop.config.mcpServers['example-backend-convergekit']).toEqual(
+    expect(payload.clientConfigs.claudeDesktop.config.mcpServers['example-backend-colab-ai-hub']).toEqual(
       {
         command: '/opt/homebrew/bin/npx',
         args: [
@@ -69,10 +69,10 @@ describe('buildMcpTokenConfig', () => {
           '--transport',
           'http-only',
           '--header',
-          'Authorization:${CONVERGEKIT_MCP_AUTH}',
+          'Authorization:${COLAB_AI_HUB_MCP_AUTH}',
         ],
         env: {
-          CONVERGEKIT_MCP_AUTH: 'Bearer convergekit_test_token',
+          COLAB_AI_HUB_MCP_AUTH: 'Bearer convergekit_test_token',
         },
       },
     )
@@ -150,12 +150,12 @@ describe('buildMcpTokenConfig', () => {
       env: { API_BASE_URL: 'http://localhost:4001' },
     })
 
-    expect(payload.config.mcpServers['example-backend-convergekit']?.headers.Authorization).toBe(
+    expect(payload.config.mcpServers['example-backend-colab-ai-hub']?.headers.Authorization).toBe(
       'Bearer <paste-your-token-here>',
     )
     expect(
-      payload.clientConfigs.claudeDesktop.config.mcpServers['example-backend-convergekit']?.env
-        ?.CONVERGEKIT_MCP_AUTH,
+      payload.clientConfigs.claudeDesktop.config.mcpServers['example-backend-colab-ai-hub']?.env
+        ?.COLAB_AI_HUB_MCP_AUTH,
     ).toBe('Bearer <paste-your-token-here>')
   })
 
@@ -168,16 +168,16 @@ describe('buildMcpTokenConfig', () => {
       env: { API_BASE_URL: 'http://localhost:4001' },
     })
 
-    expect(payload.config.mcpServers['example-backend-convergekit']?.headers.Authorization).toBe(
+    expect(payload.config.mcpServers['example-backend-colab-ai-hub']?.headers.Authorization).toBe(
       'Bearer convergekit_test_token',
     )
     expect(
-      payload.clientConfigs.generic.config.mcpServers['example-backend-convergekit']?.headers
+      payload.clientConfigs.generic.config.mcpServers['example-backend-colab-ai-hub']?.headers
         .Authorization,
     ).toBe('Bearer convergekit_test_token')
     expect(
-      payload.clientConfigs.claudeDesktop.config.mcpServers['example-backend-convergekit']?.env
-        ?.CONVERGEKIT_MCP_AUTH,
+      payload.clientConfigs.claudeDesktop.config.mcpServers['example-backend-colab-ai-hub']?.env
+        ?.COLAB_AI_HUB_MCP_AUTH,
     ).toBe('Bearer convergekit_test_token')
   })
 })
