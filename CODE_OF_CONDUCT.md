@@ -1,6 +1,6 @@
 # Code of Conduct
 
-Colab Ai Hub is an open source project for aligning product intent,
+Colab Ai Hub is an open-source project for aligning product intent,
 engineering reality, and agent context. Contributors are expected to keep that
 alignment practical, respectful, and evidence-driven.
 

@@ -141,6 +141,27 @@ SECOND
     })
   })
 
+  it('reads OID email and name attributes and skips empty array members', () => {
+    expect(
+      resolveWorkforceSamlIdentity({
+        nameID: undefined,
+        attributes: {
+          'urn:oid:0.9.2342.19200300.100.1.3': ['', 'user@example.com'],
+          'urn:oid:2.5.4.3': ['', 'Test User'],
+        },
+      }),
+    ).toEqual({ email: 'user@example.com', name: 'Test User' })
+  })
+
+  it('rejects responses without any resolvable email identity', () => {
+    expect(() => resolveWorkforceSamlIdentity({ nameID: undefined, attributes: {} })).toThrow(
+      /resolvable email identity/,
+    )
+    expect(() => resolveWorkforceSamlIdentity({ nameID: '', attributes: { email: '' } })).toThrow(
+      /resolvable email identity/,
+    )
+  })
+
   it('rejects malformed SAML responses', async () => {
     const service = buildWorkforceSamlService(enabledConfig)
 

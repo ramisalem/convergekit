@@ -57,8 +57,10 @@ function firstAttributeString(
 ): string | null {
   for (const key of keys) {
     const value = attributes?.[key]
-    const candidate = Array.isArray(value) ? value[0] : value
-    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim()
+    const candidates = Array.isArray(value) ? value : [value]
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string' && candidate.trim()) return candidate.trim()
+    }
   }
   return null
 }
@@ -74,6 +76,10 @@ export function resolveWorkforceSamlIdentity(extract: {
   // may send an opaque/hashed NameID depending on the provider's NameID mapping, so a
   // non-email NameID must not shadow an explicit email attribute.
   const email = nameId.includes('@') ? nameId : (attributeEmail ?? nameId)
+  if (!email) {
+    // An empty identity must never reach account lookup/linking downstream.
+    throw new Error('SAML response did not contain a resolvable email identity')
+  }
 
   return {
     email,

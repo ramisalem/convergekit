@@ -32,7 +32,10 @@ The SP endpoints served by the API:
    - **Name**: `Colab Ai Hub`
    - **Authorization flow**: your usual implicit/explicit consent flow
    - **ACS URL**: `https://<your-host>/api/auth/workforce-saml/acs`
-   - **Issuer**: your Authentik base URL, e.g. `https://authentik.example.com`
+   - **Issuer**: an explicit issuer for this provider, e.g.
+     `https://authentik.example.com`. (If you leave Authentik's default, the
+     issuer is the provider metadata URL — either way,
+     `WORKFORCE_SAML_IDP_ENTITY_ID` must be set to this exact value.)
    - **Service Provider Binding**: `Post`
    - **Audience**: the SP entity ID, e.g. `urn:convergekit:dev` (must equal
      `WORKFORCE_SAML_SP_ENTITY_ID`)
@@ -58,7 +61,7 @@ From **Applications → Providers → Colab Ai Hub**:
 
 - **SSO URL (Redirect)** — shown on the provider overview, shaped like
   `https://authentik.example.com/application/saml/colab-ai-hub/sso/binding/redirect/`
-- **Issuer** — as configured above
+- **Issuer** — copy the exact value configured on the provider
 - **Signing certificate** — download the certificate you selected
   (System → Certificates → download the PEM)
 
@@ -82,8 +85,11 @@ Notes:
 - `WORKFORCE_SAML_IDP_CERT` accepts a full PEM block (escaped `\n` is fine in
   env files), several concatenated PEM blocks, or comma-separated cert bodies —
   useful during certificate rollover.
-- All `WORKFORCE_SAML_*` values are required once `WORKFORCE_SSO_ENABLED=true`;
-  the API refuses to start with a partial configuration.
+- Once `WORKFORCE_SSO_ENABLED=true`, five values are required —
+  `WORKFORCE_SAML_IDP_SSO_URL`, `WORKFORCE_SAML_IDP_ENTITY_ID`,
+  `WORKFORCE_SAML_IDP_CERT`, `WORKFORCE_SAML_SP_ENTITY_ID`, and
+  `WORKFORCE_SAML_ACS_URL` — and the API refuses to start with a partial
+  configuration. `WORKFORCE_SAML_START_URL` is optional.
 - If `ACCESS_ALLOWED_EMAIL_DOMAIN` is set, only Authentik users whose email
   matches that domain can sign in.
 
@@ -100,7 +106,7 @@ Notes:
 
 For local development, run Authentik with its official Docker Compose stack
 (see the [Authentik installation docs](https://docs.goauthentik.io/docs/install-config/install/docker-compose))
-alongside the Colab Ai Hub dev stack, then point the `WORKFORCE_SAML_*`
-variables at `http://localhost:9000` (Authentik's default port). Remember the
-ACS and start URLs must use the host the browser reaches the app on
-(e.g. `https://convergekit-dev.local`).
+alongside the Colab Ai Hub dev stack, then point the `WORKFORCE_SAML_IDP_*`
+values at `http://localhost:9000` (Authentik's default port). The ACS and start
+URLs (`WORKFORCE_SAML_ACS_URL`, `WORKFORCE_SAML_START_URL`) must instead use
+the host the browser reaches the app on (e.g. `https://convergekit-dev.local`).
