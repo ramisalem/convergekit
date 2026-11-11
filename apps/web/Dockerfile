@@ -21,6 +21,13 @@ COPY tsconfig.base.json ./
 COPY apps/web/ apps/web/
 COPY packages/ packages/
 
+# Next.js inlines NEXT_PUBLIC_* into the client bundle at build time, so these
+# have to be present here and not only at runtime.
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_WEB_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_WEB_URL=${NEXT_PUBLIC_WEB_URL}
+
 RUN pnpm --filter @convergekit/web... build
 
 FROM node:22-alpine AS runner
