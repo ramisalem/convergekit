@@ -1,0 +1,8 @@
+# Every repo the factory runs in, one per line.
+acme/storefront
+acme/storefront   # duplicate is ignored
+
+acme-labs/billing_api
+not a repo line
+# The hub itself.
+acme/factory-hub

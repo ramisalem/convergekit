@@ -2,6 +2,7 @@ import { createBullBoard } from '@bull-board/api'
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter'
 import { HonoAdapter } from '@bull-board/hono'
 import { serveStatic } from '@hono/node-server/serve-static'
+import { resolveFactoryConfig } from '@convergekit/config/factory'
 import {
   incrementalQueue,
   mindMapQueue,
@@ -24,6 +25,7 @@ import { authRoutes } from './routes/auth.js'
 import { chatRoutes } from './routes/chat.js'
 import { ciTokenRoutes } from './routes/ci-tokens.js'
 import { documentRoutes } from './routes/documents.js'
+import { createDefaultFactoryRouteDeps, createFactoryRoutes } from './routes/factory.js'
 import { groupRoutes } from './routes/groups.js'
 import { healthRoutes } from './routes/health.js'
 import { inviteRoutes } from './routes/invites.js'
@@ -91,6 +93,14 @@ export function createApp() {
   app.route('/me', meCiTokenRoutes)
   app.route('/groups', groupRoutes)
   app.route('/users', userManagementRoutes)
+
+  // ─── Factory module (session auth; members of FACTORY_ACCESS_REPO only) ────
+  // Not mounted at all unless FACTORY_ENABLED=true, so /api/factory/* is a 404.
+  const factoryConfig = resolveFactoryConfig()
+  if (factoryConfig.enabled) {
+    app.use('/factory/*', requireAuth)
+    app.route('/factory', createFactoryRoutes(createDefaultFactoryRouteDeps(factoryConfig)))
+  }
 
   // ─── Admin routes (session auth, admin-only) ──────────────────────────────
   app.use('/admin/*', requireAuth, requireAdmin)

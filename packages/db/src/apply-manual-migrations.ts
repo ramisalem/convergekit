@@ -31,6 +31,7 @@ const manualMigrations = [
   '0022_mcp_audit_oauth.sql',
   '0023_admin_ci_tokens.sql',
   '0024_ci_token_capability.sql',
+  '0025_factory_user_state.sql',
 ] as const
 
 async function applyManualMigrationFiles(filenames: readonly string[]) {
