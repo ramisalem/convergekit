@@ -230,16 +230,36 @@ local chat, indexing, embeddings, and wiki generation.
 ConvergeKit can restrict who can sign in and which repositories can be indexed
 through deployment configuration:
 
-| Env var                          | Default      | Purpose                                                                                      |
-| -------------------------------- | ------------ | -------------------------------------------------------------------------------------------- |
-| `ACCESS_ALLOWED_EMAIL_DOMAIN`    | unset        | When set, allows only user/admin email addresses ending in this domain.                      |
-| `ACCESS_ALLOWED_GITHUB_ORG`      | unset        | When set, restricts admin GitHub organization access and repository ownership to this org.   |
-| `ACCESS_ALLOWED_REPOSITORY_HOST` | `github.com` | Allows only repositories from this Git host.                                                 |
+| Env var                          | Default      | Purpose                                                                                    |
+| -------------------------------- | ------------ | ------------------------------------------------------------------------------------------ |
+| `ACCESS_ALLOWED_EMAIL_DOMAIN`    | unset        | When set, allows only user/admin email addresses ending in this domain.                    |
+| `ACCESS_ALLOWED_GITHUB_ORG`      | unset        | When set, restricts admin GitHub organization access and repository ownership to this org. |
+| `ACCESS_ALLOWED_REPOSITORY_HOST` | `github.com` | Allows only repositories from this Git host.                                               |
 
 If the email domain or GitHub organization is unset, that restriction is not
 applied. Existing users and repositories are not migrated or deleted when these
 values change. Policy values are read at process startup, so deployment changes
 require restarting or redeploying the API/auth runtime.
+
+### Factory Module (optional)
+
+The Factory module is a read-only page at `/factory` for teams that run an AI
+software factory on GitHub. It reads the list of repos from
+`kit/docs/factory/repos.txt` in a hub repo, and each repo's profile from
+`profiles/<repo name>.md` there. Only collaborators on the access repo can open it.
+
+| Env var                  | Default      | Purpose                                                                                                                                                                                |
+| ------------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FACTORY_ENABLED`        | `false`      | Turns the module on.                                                                                                                                                                   |
+| `FACTORY_HUB_REPO`       | unset        | `owner/name` of the hub repo. Required when enabled.                                                                                                                                   |
+| `FACTORY_ACCESS_REPO`    | the hub repo | `owner/name` of the repo whose collaborators may open the module.                                                                                                                      |
+| `FACTORY_GITHUB_TOKEN`   | unset        | Service token that can read the hub repo and check its collaborators. Required when enabled.                                                                                           |
+| `FACTORY_WEBHOOK_SECRET` | unset        | Reserved for GitHub webhooks (at least 16 characters).                                                                                                                                 |
+| `FACTORY_BOARD`          | unset        | GitHub Projects board URL shown as a link.                                                                                                                                             |
+| `FACTORY_MEMBER_SIGNUP`  | `false`      | When `true`, a collaborator on the access repo who signs in with GitHub for the first time gets a normal (non-admin) account without an invite. The email domain policy still applies. |
+
+Membership is checked against GitHub and cached for 15 minutes (60 seconds for
+non-members), so removing a collaborator locks them out within 15 minutes.
 
 ## Deployment
 
