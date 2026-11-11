@@ -27,7 +27,25 @@ describe('resolveFactoryConfig', () => {
       githubToken: 'ghp_example',
       webhookSecret: null,
       board: null,
+      memberSignup: false,
     })
+  })
+
+  it('turns on member sign-up only when FACTORY_MEMBER_SIGNUP is true', () => {
+    const base = {
+      FACTORY_ENABLED: 'true',
+      FACTORY_HUB_REPO: 'acme/factory-hub',
+      FACTORY_GITHUB_TOKEN: 'ghp_example',
+    }
+    expect(resolveFactoryConfig({ ...base, FACTORY_MEMBER_SIGNUP: 'true' })).toMatchObject({
+      memberSignup: true,
+    })
+    expect(resolveFactoryConfig({ ...base, FACTORY_MEMBER_SIGNUP: '' })).toMatchObject({
+      memberSignup: false,
+    })
+    expect(() => resolveFactoryConfig({ ...base, FACTORY_MEMBER_SIGNUP: 'yes' })).toThrow(
+      /FACTORY_MEMBER_SIGNUP/,
+    )
   })
 
   it('accepts a separate access repo and board', () => {

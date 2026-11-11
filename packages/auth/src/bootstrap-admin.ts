@@ -24,6 +24,8 @@ type ResolveOAuthUserCreateInput = {
   adminCount: number
   initialAdminEmail?: string
   accessPolicy?: AccessPolicyConfig
+  /** True when this GitHub user is a collaborator on the factory access repo and member sign-up is on. */
+  factoryMember?: boolean
   userData: BootstrapUserData
 }
 
@@ -35,7 +37,7 @@ function throwSignUpDisabled(): never {
 }
 
 type ResolveOAuthUserCreateResult =
-  | { data: BootstrapUserData & { role: 'admin' } }
+  | { data: BootstrapUserData & { role: 'admin' | 'user' } }
   | { data: BootstrapUserData }
 
 export type OAuthProviderId = 'github'
@@ -53,6 +55,7 @@ export function resolveOAuthUserCreate({
   adminCount,
   initialAdminEmail,
   accessPolicy = accessPolicyConfig,
+  factoryMember = false,
   userData,
 }: ResolveOAuthUserCreateInput & {
   providerId: OAuthProviderId | null
@@ -73,6 +76,15 @@ export function resolveOAuthUserCreate({
     isAllowedAccessPolicyEmail(email, accessPolicy)
   ) {
     return { data: { ...userData, role: 'admin' as const } }
+  }
+
+  if (
+    providerId === 'github' &&
+    factoryMember &&
+    email &&
+    isAllowedAccessPolicyEmail(email, accessPolicy)
+  ) {
+    return { data: { ...userData, role: 'user' as const } }
   }
 
   throwSignUpDisabled()

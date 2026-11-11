@@ -11,6 +11,7 @@ COPY packages/ai/package.json packages/ai/
 COPY packages/auth/package.json packages/auth/
 COPY packages/config/package.json packages/config/
 COPY packages/db/package.json packages/db/
+COPY packages/factory/package.json packages/factory/
 COPY packages/mcp/package.json packages/mcp/
 COPY packages/queues/package.json packages/queues/
 COPY packages/types/package.json packages/types/
