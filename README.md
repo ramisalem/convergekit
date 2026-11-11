@@ -248,18 +248,24 @@ software factory on GitHub. It reads the list of repos from
 `kit/docs/factory/repos.txt` in a hub repo, and each repo's profile from
 `profiles/<repo name>.md` there. Only collaborators on the access repo can open it.
 
-| Env var                  | Default      | Purpose                                                                                                                                                                                |
-| ------------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FACTORY_ENABLED`        | `false`      | Turns the module on.                                                                                                                                                                   |
-| `FACTORY_HUB_REPO`       | unset        | `owner/name` of the hub repo. Required when enabled.                                                                                                                                   |
-| `FACTORY_ACCESS_REPO`    | the hub repo | `owner/name` of the repo whose collaborators may open the module.                                                                                                                      |
-| `FACTORY_GITHUB_TOKEN`   | unset        | Service token that can read the hub repo and check its collaborators. Required when enabled.                                                                                           |
-| `FACTORY_WEBHOOK_SECRET` | unset        | Reserved for GitHub webhooks (at least 16 characters).                                                                                                                                 |
-| `FACTORY_BOARD`          | unset        | GitHub Projects board URL shown as a link.                                                                                                                                             |
-| `FACTORY_MEMBER_SIGNUP`  | `false`      | When `true`, a collaborator on the access repo who signs in with GitHub for the first time gets a normal (non-admin) account without an invite. The email domain policy still applies. |
+| Env var                  | Default      | Purpose                                                                                                                                                                                                        |
+| ------------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FACTORY_ENABLED`        | `false`      | Turns the module on.                                                                                                                                                                                           |
+| `FACTORY_HUB_REPO`       | unset        | `owner/name` of the hub repo. Required when enabled.                                                                                                                                                           |
+| `FACTORY_ACCESS_REPO`    | the hub repo | `owner/name` of the repo whose collaborators may open the module.                                                                                                                                              |
+| `FACTORY_GITHUB_TOKEN`   | unset        | Service token that can read the hub repo and check its collaborators. Required when enabled.                                                                                                                   |
+| `FACTORY_WEBHOOK_SECRET` | unset        | Reserved for GitHub webhooks (at least 16 characters).                                                                                                                                                         |
+| `FACTORY_BOARD`          | unset        | GitHub Projects board URL shown as a link.                                                                                                                                                                     |
+| `FACTORY_MEMBER_SIGNUP`  | `false`      | When `true`, a collaborator on the access repo who signs in with GitHub for the first time gets a normal (non-admin) account without an invite. The email domain policy still applies.                         |
+| `FACTORY_MEMBER_GROUP`   | unset        | Name of an existing group (Settings → Groups) that members created by `FACTORY_MEMBER_SIGNUP` join, so they see the repositories assigned to it. Unset leaves them without a group until an admin assigns one. |
 
 Membership is checked against GitHub and cached for 15 minutes (60 seconds for
 non-members), so removing a collaborator locks them out within 15 minutes.
+
+Only admins add, reindex or delete repositories. To share indexed repositories with
+the team, create a group in Settings → Groups, assign the repositories to it, and
+set `FACTORY_MEMBER_GROUP` to its name; members who are already signed up can be
+moved into the group from Settings → Users.
 
 ## Deployment
 

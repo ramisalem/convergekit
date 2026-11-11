@@ -38,6 +38,7 @@ beforeEach(() => {
       webhookSecret: null,
       board: null,
       memberSignup: false,
+      memberGroup: null,
     },
     resolveAccess: vi.fn(async () => access),
     loadHub: vi.fn(async () => ({

@@ -2,6 +2,7 @@ import { resolveFactoryConfig } from '@convergekit/config/factory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createFactoryMemberCheck,
+  createFactoryMemberGroups,
   createGitHubLoginMemory,
   GITHUB_LOGIN_TTL_MS,
 } from './factory-member-signup.js'
@@ -83,6 +84,69 @@ describe('createFactoryMemberCheck', () => {
     await expect(check(verified)).resolves.toBe(false)
     expect(warn).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'factory_member_signup_check_failed', login: 'pat' }),
+    )
+  })
+})
+
+describe('createFactoryMemberGroups', () => {
+  const withGroup = (group: string) =>
+    resolveFactoryConfig({
+      FACTORY_ENABLED: 'true',
+      FACTORY_HUB_REPO: 'acme/factory-hub',
+      FACTORY_GITHUB_TOKEN: 'ghp_service',
+      FACTORY_MEMBER_SIGNUP: 'true',
+      FACTORY_MEMBER_GROUP: group,
+    })
+
+  function setup(config = withGroup('Team'), groupId: string | null = 'g1') {
+    const deps = {
+      config,
+      findGroupId: vi.fn(async () => groupId),
+      setUserGroup: vi.fn(async () => {}),
+      warn: vi.fn(),
+      now: () => clock,
+    }
+    return { deps, groups: createFactoryMemberGroups(deps) }
+  }
+
+  it('puts a marked new member into the configured group', async () => {
+    const { deps, groups } = setup()
+    groups.markNewMember('Pat@Example.com')
+    await groups.onUserCreated({ id: 'u1', email: 'pat@example.com' })
+    expect(deps.findGroupId).toHaveBeenCalledWith('Team')
+    expect(deps.setUserGroup).toHaveBeenCalledWith('u1', 'g1')
+  })
+
+  it('leaves users who were not marked alone', async () => {
+    const { deps, groups } = setup()
+    await groups.onUserCreated({ id: 'u1', email: 'pat@example.com' })
+    expect(deps.findGroupId).not.toHaveBeenCalled()
+  })
+
+  it('does nothing without a configured group', async () => {
+    const { deps, groups } = setup(enabled('true'))
+    groups.markNewMember('pat@example.com')
+    await groups.onUserCreated({ id: 'u1', email: 'pat@example.com' })
+    expect(deps.findGroupId).not.toHaveBeenCalled()
+  })
+
+  it('warns and skips when the group does not exist', async () => {
+    const { deps, groups } = setup(withGroup('Team'), null)
+    groups.markNewMember('pat@example.com')
+    await groups.onUserCreated({ id: 'u1', email: 'pat@example.com' })
+    expect(deps.setUserGroup).not.toHaveBeenCalled()
+    expect(deps.warn).toHaveBeenCalledWith({ event: 'factory_member_group_missing', group: 'Team' })
+  })
+
+  it('warns instead of failing the sign-in on a database error', async () => {
+    const { deps, groups } = setup()
+    deps.setUserGroup.mockRejectedValueOnce(new Error('db down'))
+    groups.markNewMember('pat@example.com')
+    await expect(groups.onUserCreated({ id: 'u1', email: 'pat@example.com' })).resolves.toBe(
+      undefined,
+    )
+    expect(deps.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'factory_member_group_failed', group: 'Team' }),
     )
   })
 })

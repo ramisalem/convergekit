@@ -51,7 +51,12 @@ import {
   getRepositoryListSummaries,
 } from '../lib/repository-list-summary.js'
 import { serializeRepositoryForResponse } from '../lib/repository-response.js'
-import { assertRepoAccess, assertRepoAdminAction, scopedRepositoryIds } from '../lib/scoping.js'
+import {
+  assertAdminUser,
+  assertRepoAccess,
+  assertRepoAdminAction,
+  scopedRepositoryIds,
+} from '../lib/scoping.js'
 
 export const repositoryRoutes = new Hono()
 const MINDMAP_PATH = '__mindmap__'
@@ -91,11 +96,12 @@ async function resolveRepositoryAnalysisCloneUrl(repo: RepositoryRecord): Promis
 
 /**
  * POST /api/repositories
- * Create a new repository record and enqueue an analysis job.
+ * Create a new repository record and enqueue an analysis job. Admins only.
  * Returns { repositoryId, jobId } with 202 Accepted.
  */
 repositoryRoutes.post('/', async (c) => {
   const userId = c.get('userId')
+  await assertAdminUser(userId)
   const body = createRepositorySchema.parse(await c.req.json())
 
   let parsedRepository

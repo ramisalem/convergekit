@@ -28,6 +28,21 @@ describe('resolveFactoryConfig', () => {
       webhookSecret: null,
       board: null,
       memberSignup: false,
+      memberGroup: null,
+    })
+  })
+
+  it('reads the group that new members join', () => {
+    const base = {
+      FACTORY_ENABLED: 'true',
+      FACTORY_HUB_REPO: 'acme/factory-hub',
+      FACTORY_GITHUB_TOKEN: 'ghp_example',
+    }
+    expect(resolveFactoryConfig({ ...base, FACTORY_MEMBER_GROUP: ' Team ' })).toMatchObject({
+      memberGroup: 'Team',
+    })
+    expect(resolveFactoryConfig({ ...base, FACTORY_MEMBER_GROUP: '' })).toMatchObject({
+      memberGroup: null,
     })
   })
 

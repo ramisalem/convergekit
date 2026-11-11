@@ -5,6 +5,7 @@ import { resolveWorkforceSsoConfig } from '@convergekit/config/workforce-sso'
 import {
   account,
   db,
+  groups,
   oauthAccessToken,
   oauthApplication,
   oauthConsent,
@@ -26,7 +27,11 @@ import {
   getOAuthProviderIdFromContext,
   resolveOAuthUserCreate,
 } from './bootstrap-admin.js'
-import { createFactoryMemberCheck, createGitHubLoginMemory } from './factory-member-signup.js'
+import {
+  createFactoryMemberCheck,
+  createFactoryMemberGroups,
+  createGitHubLoginMemory,
+} from './factory-member-signup.js'
 import { completePendingInvitesForLinkedAccount } from './invitation-completion.js'
 import { buildMcpOAuthPlugins } from './mcp-oauth-plugin.js'
 import { buildAuthSocialProviders } from './social-providers.js'
@@ -55,6 +60,23 @@ const isFactoryMember = createFactoryMemberCheck({
   config: factoryConfig,
   github: factoryConfig.enabled ? createFactoryGitHub({ token: factoryConfig.githubToken }) : null,
   logins: githubLogins,
+  warn: (details) => console.warn(details),
+})
+// Optional: those members join the group named by FACTORY_MEMBER_GROUP, so they see the
+// repositories an admin assigned to it.
+const factoryMemberGroups = createFactoryMemberGroups({
+  config: factoryConfig,
+  async findGroupId(name) {
+    const [row] = await db
+      .select({ id: groups.id })
+      .from(groups)
+      .where(eq(groups.name, name))
+      .limit(1)
+    return row?.id ?? null
+  },
+  async setUserGroup(userId, groupId) {
+    await db.update(user).set({ groupId }).where(eq(user.id, userId))
+  },
   warn: (details) => console.warn(details),
 })
 
@@ -128,14 +150,22 @@ export const auth = betterAuth({
               ? null
               : getOAuthProviderIdFromContext(context)
 
-          return resolveOAuthUserCreate({
+          const factoryMember = providerId === 'github' && (await isFactoryMember(userData))
+          const result = resolveOAuthUserCreate({
             providerId,
             adminCount: count,
             initialAdminEmail,
             accessPolicy: accessPolicyConfig,
-            factoryMember: providerId === 'github' && (await isFactoryMember(userData)),
+            factoryMember,
             userData,
           })
+          if (factoryMember && 'role' in result.data && result.data.role === 'user') {
+            factoryMemberGroups.markNewMember(String(result.data.email))
+          }
+          return result
+        },
+        after: async (createdUser) => {
+          await factoryMemberGroups.onUserCreated(createdUser)
         },
       },
     },

@@ -26,6 +26,11 @@ export type FactoryConfig =
        * time gets a normal (non-admin) account, without an admin invite.
        */
       memberSignup: boolean
+      /**
+       * Name of an existing group that members created by member sign-up join, so they see
+       * the repositories assigned to that group. Null leaves new members without a group.
+       */
+      memberGroup: string | null
     }
 
 const repoPattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}$/
@@ -43,6 +48,7 @@ const factoryEnvSchema = z.object({
   FACTORY_WEBHOOK_SECRET: optional(z.string().min(16, 'must be at least 16 characters')),
   FACTORY_BOARD: optional(z.string().url()),
   FACTORY_MEMBER_SIGNUP: optional(z.enum(['true', 'false'])),
+  FACTORY_MEMBER_GROUP: optional(z.string().trim().min(1)),
 })
 
 export function resolveFactoryConfig(
@@ -78,5 +84,6 @@ export function resolveFactoryConfig(
     webhookSecret: value.FACTORY_WEBHOOK_SECRET ?? null,
     board: value.FACTORY_BOARD ?? null,
     memberSignup: value.FACTORY_MEMBER_SIGNUP === 'true',
+    memberGroup: value.FACTORY_MEMBER_GROUP ?? null,
   }
 }
