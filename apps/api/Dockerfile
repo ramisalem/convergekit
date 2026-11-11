@@ -16,6 +16,7 @@ COPY packages/ai/package.json packages/ai/
 COPY packages/auth/package.json packages/auth/
 COPY packages/mcp/package.json packages/mcp/
 COPY packages/config/package.json packages/config/
+COPY packages/factory/package.json packages/factory/
 
 RUN pnpm install --frozen-lockfile
 

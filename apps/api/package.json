@@ -22,6 +22,7 @@
     "@convergekit/auth": "workspace:*",
     "@convergekit/config": "workspace:*",
     "@convergekit/db": "workspace:*",
+    "@convergekit/factory": "workspace:*",
     "@convergekit/mcp": "workspace:*",
     "@convergekit/queues": "workspace:*",
     "@convergekit/types": "workspace:*",

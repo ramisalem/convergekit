@@ -82,7 +82,14 @@ export async function assertRepoAccess(userId: string, repositoryId: string): Pr
  */
 export async function assertRepoAdminAction(userId: string, repositoryId: string): Promise<void> {
   await assertRepoAccess(userId, repositoryId)
+  await assertAdminUser(userId)
+}
 
+/**
+ * Adding a repository is admin-only too: admins decide what gets indexed and share it with
+ * regular users through groups.
+ */
+export async function assertAdminUser(userId: string): Promise<void> {
   const dbUser = await db.select({ role: user.role }).from(user).where(eq(user.id, userId)).limit(1)
 
   if (dbUser[0]?.role !== 'admin') {

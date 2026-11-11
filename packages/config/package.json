@@ -8,7 +8,8 @@
     "./env": "./src/env.ts",
     "./access-policy": "./src/access-policy.ts",
     "./workforce-sso": "./src/workforce-sso.ts",
-    "./mcp-oauth": "./src/mcp-oauth.ts"
+    "./mcp-oauth": "./src/mcp-oauth.ts",
+    "./factory": "./src/factory.ts"
   },
   "scripts": {
     "test": "vitest run",

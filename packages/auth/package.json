@@ -16,6 +16,7 @@
     "@authenio/samlify-node-xmllint": "^2.0.0",
     "@convergekit/config": "workspace:*",
     "@convergekit/db": "workspace:*",
+    "@convergekit/factory": "workspace:*",
     "better-auth": "^1.6.13",
     "drizzle-orm": "^0.45.2",
     "ioredis": "^5.4.2",

@@ -76,6 +76,56 @@ export const meApi = {
   },
 }
 
+// ─── Factory module ───────────────────────────────────────────────────────────
+
+export type FactoryMe =
+  | {
+      member: true
+      login: string
+      reason: null
+      accessRepo: string
+      hubRepo: string
+      board: string | null
+      onboardedAt: string | null
+    }
+  | {
+      member: false
+      login: string | null
+      reason: 'no_github_account' | 'unknown_github_account' | 'not_collaborator' | 'github_error'
+      accessRepo: string
+    }
+
+export type FactoryHubRepo = {
+  fullName: string
+  profile: {
+    product: string | null
+    app: string | null
+    integrationBranch: string | null
+    productionBranch: string | null
+    stagingSite: string | null
+    people: {
+      productOwners: string[]
+      qa: string[]
+      developers: string[]
+      reviewAccounts: string[]
+      umbrellaApprovals: number | null
+    }
+  } | null
+}
+
+export const factoryApi = {
+  /** 404 (ApiError) when the module is turned off. */
+  me(): Promise<FactoryMe> {
+    return apiFetch('/api/factory/me')
+  },
+  setOnboarded(onboarded: boolean): Promise<{ onboardedAt: string | null }> {
+    return apiFetch('/api/factory/me', { method: 'PUT', body: JSON.stringify({ onboarded }) })
+  },
+  hub(): Promise<{ hubRepo: string; repos: FactoryHubRepo[] }> {
+    return apiFetch('/api/factory/hub')
+  },
+}
+
 // ─── Connected agents (OAuth) ─────────────────────────────────────────────────
 
 export type ConnectedAgent = {

@@ -22,7 +22,17 @@ describe('repository route action permissions', () => {
 
     expect(repositorySource).not.toContain("mcp-tokens'")
 
-    expect(repositorySource).toContain("repositoryRoutes.post('/:id/incremental-indexing/check-now'")
+    const createRoute = repositorySource.slice(
+      repositorySource.indexOf("repositoryRoutes.post('/', async"),
+    )
+    expect(createRoute.indexOf('await assertAdminUser(userId)')).toBeGreaterThan(-1)
+    expect(createRoute.indexOf('await assertAdminUser(userId)')).toBeLessThan(
+      createRoute.indexOf('.insert(repositories)'),
+    )
+
+    expect(repositorySource).toContain(
+      "repositoryRoutes.post('/:id/incremental-indexing/check-now'",
+    )
     expect(repositorySource).toContain("repositoryRoutes.post('/:id/incremental-indexing/pause'")
     expect(repositorySource).toContain("repositoryRoutes.post('/:id/incremental-indexing/resume'")
     expect(repositorySource).toContain("repositoryRoutes.get('/:id/incremental-indexing/runs'")

@@ -603,6 +603,20 @@ export const oauthConsent = pgTable('oauth_consent', {
   consentGiven: boolean('consent_given'),
 })
 
+// ─── Factory module ──────────────────────────────────────────────────────────
+// Per-viewer state for the Factory module (onboarding progress). Team facts are read
+// from the hub repo on GitHub, not stored here.
+
+export const factoryUserState = pgTable('factory_user_state', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  githubLogin: text('github_login'),
+  onboardedAt: timestamp('onboarded_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+})
+
 // ─── Relations ────────────────────────────────────────────────────────────────
 
 export const userRelations = relations(user, ({ one, many }) => ({
@@ -776,3 +790,6 @@ export type NewUserInvitation = typeof userInvitations.$inferInsert
 
 export type IndexingRun = typeof indexingRuns.$inferSelect
 export type NewIndexingRun = typeof indexingRuns.$inferInsert
+
+export type FactoryUserState = typeof factoryUserState.$inferSelect
+export type NewFactoryUserState = typeof factoryUserState.$inferInsert

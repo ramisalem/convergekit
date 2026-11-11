@@ -1,6 +1,7 @@
 import { AccountNavLinks } from '@/components/account-nav-links'
 import { AdminNavLinks } from '@/components/admin-nav-links'
 import { ConvergeKitLogo } from '@/components/convergekit-logo'
+import { FactoryNavLink } from '@/components/factory/factory-nav-link'
 import { NavLinks } from '@/components/nav-links'
 import { UserNav } from '@/components/user-nav'
 import { useTranslations } from 'next-intl'
@@ -22,6 +23,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </a>
             <nav className="flex items-center gap-1">
               <NavLinks items={[{ href: '/repositories', label: t('repositories') }]} />
+              <FactoryNavLink label={t('factory')} />
               <AccountNavLinks
                 connectedAgentsLabel={t('connectedAgents')}
                 ciTokensLabel={t('ciTokens')}
