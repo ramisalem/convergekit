@@ -1,4 +1,5 @@
 import { accessPolicyConfig } from '@convergekit/config/access-policy'
+import { resolveFactoryConfig } from '@convergekit/config/factory'
 import { resolveMcpOAuthConfig } from '@convergekit/config/mcp-oauth'
 import { resolveWorkforceSsoConfig } from '@convergekit/config/workforce-sso'
 import {
@@ -11,6 +12,7 @@ import {
   user,
   verification,
 } from '@convergekit/db'
+import { createFactoryGitHub } from '@convergekit/factory/github'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { eq, sql } from 'drizzle-orm'
@@ -24,6 +26,7 @@ import {
   getOAuthProviderIdFromContext,
   resolveOAuthUserCreate,
 } from './bootstrap-admin.js'
+import { createFactoryMemberCheck, createGitHubLoginMemory } from './factory-member-signup.js'
 import { completePendingInvitesForLinkedAccount } from './invitation-completion.js'
 import { buildMcpOAuthPlugins } from './mcp-oauth-plugin.js'
 import { buildAuthSocialProviders } from './social-providers.js'
@@ -44,9 +47,25 @@ if (!githubClientId || !githubClientSecret || !secret) {
   )
 }
 
+// Optional: collaborators on the factory access repo may create their own (non-admin)
+// account by signing in with GitHub. Off unless FACTORY_MEMBER_SIGNUP=true.
+const factoryConfig = resolveFactoryConfig()
+const githubLogins = createGitHubLoginMemory()
+const isFactoryMember = createFactoryMemberCheck({
+  config: factoryConfig,
+  github: factoryConfig.enabled ? createFactoryGitHub({ token: factoryConfig.githubToken }) : null,
+  logins: githubLogins,
+  warn: (details) => console.warn(details),
+})
+
 const socialProviders = buildAuthSocialProviders({
   githubClientId,
   githubClientSecret,
+  onGitHubProfile: ({ login, email }) => {
+    if (factoryConfig.enabled && factoryConfig.memberSignup && email) {
+      githubLogins.remember(email, login)
+    }
+  },
 })
 const workforceSamlService = buildWorkforceSamlService(workforceSsoConfig)
 
@@ -104,14 +123,17 @@ export const auth = betterAuth({
             .from(user)
             .where(eq(user.role, 'admin'))
 
+          const providerId =
+            (userData as { __source?: unknown }).__source === WORKFORCE_SAML_PROVIDER_ID
+              ? null
+              : getOAuthProviderIdFromContext(context)
+
           return resolveOAuthUserCreate({
-            providerId:
-              (userData as { __source?: unknown }).__source === WORKFORCE_SAML_PROVIDER_ID
-                ? null
-                : getOAuthProviderIdFromContext(context),
+            providerId,
             adminCount: count,
             initialAdminEmail,
             accessPolicy: accessPolicyConfig,
+            factoryMember: providerId === 'github' && (await isFactoryMember(userData)),
             userData,
           })
         },

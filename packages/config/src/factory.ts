@@ -21,6 +21,11 @@ export type FactoryConfig =
       webhookSecret: string | null
       /** Optional GitHub Projects board URL shown as a link. */
       board: string | null
+      /**
+       * When true, a collaborator on the access repo who signs in with GitHub for the first
+       * time gets a normal (non-admin) account, without an admin invite.
+       */
+      memberSignup: boolean
     }
 
 const repoPattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}$/
@@ -37,6 +42,7 @@ const factoryEnvSchema = z.object({
   FACTORY_GITHUB_TOKEN: optional(z.string().trim().min(1)),
   FACTORY_WEBHOOK_SECRET: optional(z.string().min(16, 'must be at least 16 characters')),
   FACTORY_BOARD: optional(z.string().url()),
+  FACTORY_MEMBER_SIGNUP: optional(z.enum(['true', 'false'])),
 })
 
 export function resolveFactoryConfig(
@@ -71,5 +77,6 @@ export function resolveFactoryConfig(
     githubToken: value.FACTORY_GITHUB_TOKEN as string,
     webhookSecret: value.FACTORY_WEBHOOK_SECRET ?? null,
     board: value.FACTORY_BOARD ?? null,
+    memberSignup: value.FACTORY_MEMBER_SIGNUP === 'true',
   }
 }

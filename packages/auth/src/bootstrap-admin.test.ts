@@ -121,6 +121,44 @@ describe('OAuth user creation policy', () => {
     ).toThrowError(/signup disabled/i)
   })
 
+  it('creates a normal user for a factory member after bootstrap', () => {
+    const result = resolveOAuthUserCreate({
+      providerId: 'github',
+      adminCount: 1,
+      initialAdminEmail: 'hassan.shabbir@example.com',
+      accessPolicy: examplePolicy,
+      factoryMember: true,
+      userData: { email: 'pat@example.com', name: 'Pat' },
+    })
+
+    expect(result).toEqual({ data: { email: 'pat@example.com', name: 'Pat', role: 'user' } })
+  })
+
+  it('still makes the initial admin an admin when they are also a factory member', () => {
+    const result = resolveOAuthUserCreate({
+      providerId: 'github',
+      adminCount: 0,
+      initialAdminEmail: 'hassan.shabbir@example.com',
+      accessPolicy: examplePolicy,
+      factoryMember: true,
+      userData: { email: 'hassan.shabbir@example.com' },
+    })
+
+    expect(result).toMatchObject({ data: { role: 'admin' } })
+  })
+
+  it('keeps the email domain policy for factory members', () => {
+    expect(() =>
+      resolveOAuthUserCreate({
+        providerId: 'github',
+        adminCount: 1,
+        accessPolicy: examplePolicy,
+        factoryMember: true,
+        userData: { email: 'pat@elsewhere.com' },
+      }),
+    ).toThrowError(/signup disabled/i)
+  })
+
   it('extracts only GitHub OAuth provider id from Better Auth callback params', () => {
     expect(getOAuthProviderIdFromContext({ params: { id: 'github' } })).toBe('github')
     expect(() => getOAuthProviderIdFromContext({ params: { id: 'google' } })).toThrowError(

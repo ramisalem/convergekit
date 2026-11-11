@@ -37,6 +37,7 @@ beforeEach(() => {
       githubToken: 'ghp_service',
       webhookSecret: null,
       board: null,
+      memberSignup: false,
     },
     resolveAccess: vi.fn(async () => access),
     loadHub: vi.fn(async () => ({
