@@ -1,9 +1,12 @@
 'use client'
 
+import { GitHubSignInButton } from '@/components/github-sign-in-button'
 import { PageHeader } from '@/components/ui/page-header'
 import { useUser } from '@/components/user-nav'
 import { ApiError, factoryApi, type FactoryHubRepo, type FactoryMe } from '@/lib/api-client'
+import { getWebBaseUrl } from '@/lib/runtime-urls'
 import { useTranslations } from 'next-intl'
+import { usePathname } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 
 type MeState =
@@ -24,6 +27,7 @@ function errorMessage(error: unknown) {
 export function FactoryHome() {
   const t = useTranslations('factory')
   const { user, loading: userLoading } = useUser()
+  const pathname = usePathname()
   const [me, setMe] = useState<MeState>({ kind: 'loading' })
 
   const loadMe = useCallback(() => {
@@ -48,12 +52,11 @@ export function FactoryHome() {
   if (!user) {
     return (
       <Notice title={t('signedOutTitle')} body={t('signedOutBody')}>
-        <a
-          href="/auth/sign-in"
-          className="mt-4 inline-flex rounded-md bg-[var(--convergekit-ink)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
-        >
-          {t('signIn')}
-        </a>
+        {/* Straight to GitHub: the factory gate is GitHub membership, so other sign-in methods
+            would only lead to "no GitHub account linked". Come back to this page afterwards. */}
+        <div className="mt-4">
+          <GitHubSignInButton label={t('signIn')} redirectTo={`${getWebBaseUrl()}${pathname}`} />
+        </div>
       </Notice>
     )
   }
