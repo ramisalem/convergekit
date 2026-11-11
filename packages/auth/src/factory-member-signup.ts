@@ -68,3 +68,52 @@ export function createFactoryMemberCheck(deps: {
     }
   }
 }
+
+export type FactoryMemberGroups = ReturnType<typeof createFactoryMemberGroups>
+
+/**
+ * Puts members created by member sign-up into the group named by FACTORY_MEMBER_GROUP, so
+ * they see the repositories the admin assigned to that group. better-auth only stores user
+ * columns it knows, so the group cannot be set while creating the user: the create hook marks
+ * the new member by email, and the after-create hook sets the group once the user exists.
+ * A missing group or a database error leaves the member without a group (they see no
+ * repositories until an admin assigns one) and is reported through `warn`.
+ */
+export function createFactoryMemberGroups(deps: {
+  config: FactoryConfig
+  findGroupId(name: string): Promise<string | null>
+  setUserGroup(userId: string, groupId: string): Promise<void>
+  warn?: (details: Record<string, unknown>) => void
+  now?: () => number
+}) {
+  const groupName = deps.config.enabled && deps.config.memberSignup ? deps.config.memberGroup : null
+  const newMembers = createGitHubLoginMemory(deps.now)
+
+  return {
+    /** Call from the create hook when the user being created is a factory member. */
+    markNewMember(email: string) {
+      if (groupName) newMembers.remember(email, groupName)
+    },
+
+    /** Call from the after-create hook with the stored user. */
+    async onUserCreated(user: { id?: unknown; email?: unknown }) {
+      if (typeof user.id !== 'string' || typeof user.email !== 'string') return
+      const name = newMembers.take(user.email)
+      if (!name) return
+      try {
+        const groupId = await deps.findGroupId(name)
+        if (!groupId) {
+          deps.warn?.({ event: 'factory_member_group_missing', group: name })
+          return
+        }
+        await deps.setUserGroup(user.id, groupId)
+      } catch (error) {
+        deps.warn?.({
+          event: 'factory_member_group_failed',
+          group: name,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    },
+  }
+}
