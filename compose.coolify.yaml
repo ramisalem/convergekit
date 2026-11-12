@@ -140,6 +140,9 @@ services:
       FACTORY_BOARD: ${FACTORY_BOARD:-}
       FACTORY_MEMBER_SIGNUP: ${FACTORY_MEMBER_SIGNUP:-false}
       FACTORY_MEMBER_GROUP: ${FACTORY_MEMBER_GROUP:-}
+      # MCP clients (Claude Code, Cursor) sign in through the browser instead of a token.
+      MCP_OAUTH_ENABLED: ${MCP_OAUTH_ENABLED:-false}
+      MCP_OAUTH_ISSUER_URL: ${MCP_OAUTH_ISSUER_URL:-}
 
   web:
     build:
