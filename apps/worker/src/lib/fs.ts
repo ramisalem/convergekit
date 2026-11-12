@@ -71,9 +71,28 @@ export async function walkRepository(rootDir: string): Promise<string[]> {
   return files.map((file) => file.absolutePath)
 }
 
+/**
+ * Read a text file as a string. Files saved as UTF-16 (a byte order mark first, as Windows
+ * PowerShell writes them) are decoded as such, and NUL characters are removed because
+ * Postgres text columns cannot store them.
+ */
 export async function readFileContent(filePath: string): Promise<string> {
-  const content = await readFile(filePath, 'utf-8')
-  return content
+  const bytes = await readFile(filePath)
+  return decodeText(bytes).replace(/\0/g, '')
+}
+
+function decodeText(bytes: Buffer): string {
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return bytes.toString('utf16le', 2)
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+    // swap16 needs an even length, so a stray trailing byte is dropped.
+    const swapped = Buffer.from(bytes.subarray(2, bytes.length - (bytes.length % 2)))
+    swapped.swap16()
+    return swapped.toString('utf16le')
+  }
+  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+    return bytes.toString('utf8', 3)
+  }
+  return bytes.toString('utf8')
 }
 
 export function relativePath(rootDir: string, filePath: string): string {

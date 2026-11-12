@@ -20,6 +20,7 @@ import {
   getModelOptionsForRepo,
 } from '../lib/ai.js'
 import { sanitizeGeneratedWikiContent } from '../lib/wiki-markdown.js'
+import { withUniqueSlugs } from '../lib/wiki-toc.js'
 import { logger } from '../logger.js'
 
 const MINDMAP_PATH = '__mindmap__'
@@ -232,7 +233,9 @@ async function processWikiGeneration(job: Job<WikiGenerationJobData>): Promise<v
   await job.updateProgress(10)
 
   // ── Step 2: Generate TOC via Haiku ────────────────────────────────────────
-  const toc = await generateToc(repositoryId, mindmapDoc.content, fileTree, modelOptions)
+  const toc = withUniqueSlugs(
+    await generateToc(repositoryId, mindmapDoc.content, fileTree, modelOptions),
+  )
   logger.info({ repositoryId, sections: toc.sections.length }, 'Wiki TOC generated')
 
   await job.updateProgress(20)
